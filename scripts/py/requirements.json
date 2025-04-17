@@ -1,0 +1,27 @@
+{
+  "models": [
+    {
+      "name": "phi-2 model",
+      "purpose": "To enable basic testing",
+      "destination": "model.gguf",
+      "url": "https://huggingface.co/ggml-org/models/resolve/main/phi-2/ggml-model-q4_0.gguf?download=true",
+      "sha256sum": "fd506d24a4bee6997a566b02b65715af5cadb433c6a3a47a74b467badc5727ca"
+    }
+  ],
+  "test_utils": [
+    {
+      "name": "hamcrest",
+      "purpose": "JUnit tests for validating the Java API",
+      "destination": "hamcrest-all-1.3.jar",
+      "url": "https://repo1.maven.org/maven2/org/hamcrest/hamcrest-all/1.3/hamcrest-all-1.3.jar",
+      "sha256sum": "4877670629ab96f34f5f90ab283125fcd9acb7e683e66319a68be6eb2cca60de"
+    },
+    {
+      "name": "JUnit",
+      "purpose": "JUnit tests for validating the Java API",
+      "destination": "junit-4.13.2.jar",
+      "url": "https://repo1.maven.org/maven2/junit/junit/4.13.2/junit-4.13.2.jar",
+      "sha256sum": "8e495b634469d64fb8acfa3495a065cbacc8a0fff55ce1e31007be4c16dc57d3"
+    }
+  ]
+}
