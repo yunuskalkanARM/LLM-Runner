@@ -102,4 +102,17 @@ LlmConfig GetConfig(std::unordered_map<std::string, std::string> config,
                      userConfig.at("batchSize"));
 }
 
+bool ContainsStopWord(const std::string& buffer,
+                        const std::vector<std::string>& stopWords,
+                        std::string& outWord)
+{
+    for(auto& w : stopWords) {
+        if(buffer.find(w) != std::string::npos) {
+            outWord = w;
+            return true;
+        }
+    }
+    return false;
+}
+
 } /* namespace Llm::Test::Utils */
