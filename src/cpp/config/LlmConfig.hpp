@@ -7,6 +7,7 @@
 #define LLM_CONFIG_HPP
 
 #include <string>
+#include <vector>
 
 /**
  * @class LlmConfig
@@ -19,29 +20,18 @@ private:
     std::string m_endTag{};
     std::string m_modelPath{};
     std::string m_llmPrefix{};
+    std::vector<std::string> m_stopWords;
     int m_numThreads{};
     int m_batchSize{};
 
 public:
     /**
-     * LlmConfig
-     * @param modelTag    Model tag for the LLM model
-     * @param userTag     User tag for the prompt
-     * @param endTag      End tag for the prompt
-     * @param modelPath   Path to the model
-     * @param llmPrefix   LLM prefix to use
-     * @param numThreads  Number of threads to use
-     * @param batchSize   Batch size to use
-     */
-    LlmConfig(const std::string& modelTag,
-              const std::string& userTag,
-              const std::string& endTag,
-              const std::string& modelPath,
-              const std::string& llmPrefix,
-              int numThreads,
-              int batchSize);
+    * Constructs an LlmConfig object from a parsed JSON configuration.
+    * @param jsonStr JSON string containing configuration keys and values.
+    */
+    LlmConfig(const std::string &jsonStr);
 
-    LlmConfig() = default;
+    LlmConfig() =default;
 
     /**
      * Returns the end tag string.
@@ -84,6 +74,12 @@ public:
      * @return batch size
      */
     int GetBatchSize() const;
+
+    /**
+     * Returns stop words of llm from the config
+     * @return  vector of stop words (strings)
+     */
+    std::vector<std::string> GetStopWords() const;
 
     /**
      * Sets the model tag (The name to appear in conversation with the LLM).
@@ -130,6 +126,23 @@ public:
      * @param batchSz chunk-size of each batch used to split query-encoding
      */
     void SetBatchSize(int batchSz);
+
+    /**
+     * Sets the Stop words in config
+     * @param stopWords is the vector of stop words
+     */
+    void SetStopWords(const std::vector<std::string>& stopWords);
+
+    /**
+    * Clears all the stop words
+    */
+    void ClearStopWords();
+
+    /**
+     * Method to append stop word to existing list.
+     * @param stopWord stop word to be added to the existing list of stop-words
+     */
+    void AddStopWord(const std::string& stopWord);
 };
 
 #endif /* LLM_CONFIG_HPP */

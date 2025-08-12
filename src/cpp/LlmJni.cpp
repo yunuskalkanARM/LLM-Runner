@@ -5,7 +5,7 @@
 //
 #include "LlmConfig.hpp"
 #include "LlmImpl.hpp"
-
+#include <iostream>
 #include <jni.h>
 
 static std::unique_ptr<LLM> llm = std::make_unique<LLM>();
@@ -14,45 +14,28 @@ static std::unique_ptr<LLM> llm = std::make_unique<LLM>();
 extern "C" {
 #endif
 
-JNIEXPORT jlong JNICALL Java_com_arm_Llm_createLlmConfig(JNIEnv* env,
+JNIEXPORT void JNICALL Java_com_arm_Llm_llmInit(JNIEnv* env,
                                                          jobject /* this */,
-                                                         jstring jModelTag,
-                                                         jstring jUserTag,
-                                                         jstring jEndTag,
-                                                         jstring jModelPath,
-                                                         jstring jLlmPrefix,
-                                                         jint jNumThreads,
-                                                         jint jBatchSize)
+                                                         jstring modelJsonStr)
 {
-    const char* modelTag  = env->GetStringUTFChars(jModelTag, nullptr);
-    const char* userTag   = env->GetStringUTFChars(jUserTag, nullptr);
-    const char* endTag    = env->GetStringUTFChars(jEndTag, nullptr);
-    const char* modelPath = env->GetStringUTFChars(jModelPath, nullptr);
-    const char* llmPrefix = env->GetStringUTFChars(jLlmPrefix, nullptr);
+    if (modelJsonStr == nullptr) {
+        std::cerr << "modelJsonStr is null" << std::endl;
+    }
 
-    auto* config = new LlmConfig(std::string(modelTag),
-                                 std::string(userTag),
-                                 std::string(endTag),
-                                 std::string(modelPath),
-                                 std::string(llmPrefix),
-                                 static_cast<int>(jNumThreads),
-                                 static_cast<int>(jBatchSize));
+    const char* modelCStr = env->GetStringUTFChars(modelJsonStr, nullptr);
+    if (modelCStr == nullptr) {
+        std::cerr << "GetStringUTFChars returned null" << std::endl;
+    }
 
-    // Clean up
-    env->ReleaseStringUTFChars(jModelTag, modelTag);
-    env->ReleaseStringUTFChars(jUserTag, userTag);
-    env->ReleaseStringUTFChars(jEndTag, endTag);
-    env->ReleaseStringUTFChars(jModelPath, modelPath);
-    env->ReleaseStringUTFChars(jLlmPrefix, llmPrefix);
+    std::string jsonStr(modelCStr);
+    env->ReleaseStringUTFChars(modelJsonStr, modelCStr);
 
-    return reinterpret_cast<jlong>(config); // Return pointer as long
-}
-
-JNIEXPORT jlong JNICALL Java_com_arm_Llm_loadModel(JNIEnv* env, jobject, jlong pconfig)
-{
-    auto config = reinterpret_cast<LlmConfig*>(pconfig);
-    llm->LlmInit(*config);
-    return 0;
+    try {
+        LlmConfig config = LlmConfig(jsonStr);
+        llm->LlmInit(config);
+        } catch (const std::exception& e) {
+        std::cerr << "Failed to create Llm from config string: " << e.what() << std::endl;
+    }
 }
 
 JNIEXPORT void JNICALL Java_com_arm_Llm_freeLlm(JNIEnv*, jobject)

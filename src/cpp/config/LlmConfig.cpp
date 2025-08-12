@@ -5,18 +5,49 @@
 //
 #include "LlmConfig.hpp"
 #include <stdexcept>
+#include <nlohmann/json.hpp>
 
-LlmConfig::LlmConfig(const std::string& modelTag,
-                     const std::string& userTag,
-                     const std::string& endTag,
-                     const std::string& modelPath,
-                     const std::string& llmPrefix,
-                     int numThreads,
-                     int batchSize) :
-    m_modelTag(modelTag), m_userTag(userTag), m_endTag(endTag), m_modelPath(modelPath), m_llmPrefix(llmPrefix)
+LlmConfig::LlmConfig(const std::string& jsonStr)
 {
-    SetNumThreads(numThreads);
-    SetBatchSize(batchSize);
+    nlohmann::json modelConfig;
+    try {
+        modelConfig = nlohmann::json::parse(jsonStr);
+    } catch (const std::exception& e) {
+        throw std::invalid_argument(std::string("Invalid JSON input: ") + e.what());
+    }
+
+    m_modelTag  = modelConfig.value("modelTag", "");
+    m_userTag   = modelConfig.value("userTag", "");
+    m_endTag    = modelConfig.value("endTag", "");
+
+    if (!modelConfig.contains("llmModelName")) {
+        throw std::runtime_error("Missing required parameter: modelPath");
+    }
+    m_modelPath = modelConfig["llmModelName"];
+
+    m_llmPrefix = modelConfig.value("llmPrefix", "");
+
+    // Stop-words should be a non-empty array of string with no null strings.
+
+    if (!modelConfig.contains("stopWords") || !modelConfig["stopWords"].is_array() || modelConfig["stopWords"].empty() )
+    {
+        throw std::invalid_argument("Missing 'stopWords' key or invalid 'stopWords', stopWords must be a non-empty array.");
+    }
+
+    std::vector<std::string> parsedStopWords;
+
+    for (const auto& val : modelConfig["stopWords"]) {
+        if (!val.is_string() || val.get<std::string>().empty()) {
+            throw std::invalid_argument("All stopWords must be non-empty strings.");
+        }
+        parsedStopWords.emplace_back(val.get<std::string>());
+    }
+
+    SetStopWords(parsedStopWords);
+    
+    //Default Batchsize is set to 256 if not provided and number of threads to 4.
+    SetNumThreads(modelConfig.value("numThreads", 4));
+    SetBatchSize(modelConfig.value("batchSize", 256));
 }
 
 std::string LlmConfig::GetEndTag() const
@@ -52,6 +83,11 @@ int LlmConfig::GetNumThreads() const
 int LlmConfig::GetBatchSize() const
 {
     return this->m_batchSize;
+}
+
+std::vector<std::string> LlmConfig::GetStopWords() const
+{
+    return this->m_stopWords;
 }
 
 void LlmConfig::SetModelTag(const std::string& modelIdentifier)
@@ -94,3 +130,23 @@ void LlmConfig::SetBatchSize(int batchSz)
     }
     this->m_batchSize = batchSz;
 }
+
+void LlmConfig::SetStopWords(const std::vector<std::string>& stopWords)
+{
+    if (stopWords.empty()) {
+        throw std::invalid_argument("Stop words must not be empty.");
+    }
+    this->m_stopWords = stopWords;
+}
+
+void LlmConfig::ClearStopWords()
+{
+    this->m_stopWords.clear();
+}
+
+void LlmConfig::AddStopWord(const std::string& stopWord)
+{
+    this->m_stopWords.push_back(stopWord);
+}
+
+

@@ -10,7 +10,9 @@ import java.util.List;
 import java.util.concurrent.Flow;
 import java.util.concurrent.SubmissionPublisher;
 import java.util.concurrent.atomic.AtomicBoolean;
-
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.io.IOException;
 /**
  * Llm class that extends the SubmissionPublisher
  */
@@ -28,39 +30,12 @@ public class Llm extends SubmissionPublisher<String>
         }
     }
 
-    private long llmPtr = 0;
-    private String modelTag = "";
-    private String userTag = "";
-    private String endTag = "";
-    private List<String> stopWords = null;
-    private String cachedToken = "";
-    private String emitToken = "";
-    private String llmPrefix = "";
-    private AtomicBoolean evaluatedOnce = new AtomicBoolean(false);
-    //#ToDo move to LlmConfig
-    private int numThreads = 4;
-    private int batchSize = 256;
-
     /**
-     * Method to create LlmConfig cpp instance from params.
-     * @param modelTag name used to refer the model
-     * @param userTag tag used to refer the user
-     * @param endTag tag to specify the end of the query
-     * @param modelPath path to load model from
-     * @param llmPrefix Initial-prompt to load into llm before query
-     * @param numThreads Number of threads for inference
-     * @param batchSize batch size used to chunk queries
-     * @return pointer to llm config
+     * Method to create Llm cpp instance from params.
+     * @param ConfigPathStr path to config.json file as a string
+     * @return null
      */
-    public native long createLlmConfig(String modelTag, String userTag, String endTag,
-                                       String modelPath, String llmPrefix, int numThreads,
-                                       int batchSize);
-    /**
-     * Method for loading LLM model
-     * @param LlmConfig load model from LlmConfig
-     * @return pointer to loaded model
-     */
-    public native long loadModel(long LlmConfig);
+    public native void llmInit(String ConfigPathStr);
 
     /**
      * Method for freeing LLM model
@@ -105,7 +80,7 @@ public class Llm extends SubmissionPublisher<String>
 
     /**
      * Method to get chat Progress in percentage
-     * @return chat progess as int
+     * @return chat progress as an integer percentage
      */
     public native int getChatProgress();
 
@@ -131,24 +106,6 @@ public class Llm extends SubmissionPublisher<String>
     public native String getFrameworkType();
 
     /**
-     * Method to separate Initialization from constructor
-     * @param llmConfig type configuration file to load model
-     */
-    public void llmInit(LlmConfig llmConfig)
-    {
-        this.stopWords = llmConfig.getStopWords();
-        this.modelTag = llmConfig.getModelTag();
-        this.userTag = llmConfig.getUserTag();
-        this.endTag = llmConfig.getEndTag();
-        this.llmPrefix = llmConfig.getLlmPrefix();
-        this.numThreads = llmConfig.getNumThreads();
-        long configPtr = createLlmConfig(this.modelTag, this.userTag, this.endTag,
-                                         llmConfig.getModelPath(), this.llmPrefix,
-                                         this.numThreads, this.batchSize);
-        this.llmPtr = loadModel(configPtr);
-    }
-
-    /**
      * Method to set subscriber
      * @param subscriber set from llama
      */
@@ -163,28 +120,18 @@ public class Llm extends SubmissionPublisher<String>
      */
     public void  sendAsync(String Query)
     {
-        String query = "";
-        AtomicBoolean stop = new AtomicBoolean(false);
-        if (evaluatedOnce.get())
-            query = userTag + Query + endTag + modelTag;
-        else
-            query = llmPrefix + userTag + Query + endTag + modelTag;
-        encode(query);
-        evaluatedOnce.set(true);
+        encode(Query);
         while (getChatProgress()<100)
         {
             String s = getNextToken();
-            stop.set(inspectWord(s));
-            if (stop.get())
+            if (s.equals("<eos>"))
             {
                 // needed for showing end of stream, Closing publisher will result in error
                 // for next query
-                emitToken = "<eos>";
-                this.submit(emitToken);
-
+                this.submit(s);
                 break;
             }
-            this.submit(emitToken);
+            this.submit(s);
         }
     }
 
@@ -196,96 +143,23 @@ public class Llm extends SubmissionPublisher<String>
     public String send(String Query)
     {
         String response = "";
-        String query = "";
-        boolean stop = false;
-        if (evaluatedOnce.get())
-            query = userTag + Query + endTag + modelTag;
-        else
-            query = llmPrefix + userTag + Query + endTag + modelTag;
-        encode(query);
-        evaluatedOnce.set(true);
+        encode(Query);
         while (getChatProgress()<100)
         {
             String s = getNextToken();
-            stop = inspectWord(s);
-            response += emitToken;
-            if (stop)
+            response += s;
+            if (s.equals("<eos>"))
               break;
         }
         return response;
     }
 
     /**
-     * Method to find any stop-Words or partial stop-Word present in current token
-     * @param str current token decoded
-     * @return boolean for detection of stop word
-     */
-    private boolean inspectWord(String str)
-    {
-       boolean stopWordTriggered = false;
-       String evaluationString = this.cachedToken + str;
-       // if stopWord is in evaluationString break loop.
-       for (String word : stopWords)
-       {
-           //use position to access inclusion of Stop-words. Preserve the substring before Stop word.
-           int position = evaluationString.indexOf(word);
-           if(position!=-1)
-           {
-               stopWordTriggered = true;
-               emitToken = evaluationString.substring(0,position);
-               cachedToken = "";
-               return stopWordTriggered;
-           }
-       }
-       emitToken = evaluationString;
-       for (String word : stopWords)
-       {
-           String partialWord = word;
-           partialWord = partialWord.substring(0, partialWord.length() - 1);
-           while (!partialWord.isEmpty())
-           {
-               // if the beginning for stop word coincides with end of emitted token don't emit current token.
-               if (evaluationString.endsWith(partialWord))
-               {
-                   emitToken = "";
-                   break;
-               } else
-               {
-                   partialWord = partialWord.substring(0, partialWord.length() - 1);
-               }
-           }
-       }
-       this.cachedToken = emitToken.isEmpty() ? evaluationString : "";
-       return stopWordTriggered;
-    }
-
-    /**
-     * Sets the LLM prefix used for query processing.
-     * @param llmPrefix initial prompt for llm
-     */
-    public void setLlmPrefix(String llmPrefix)
-    {
-      this.llmPrefix = llmPrefix;
-    }
-
-    /**
-     * Sets the LLM ModelTag
-     * @param newTag tag to set for the model
-     */
-    public void setLlmModelTag(String newTag)
-    {
-       this.modelTag = newTag;
-    }
-
-    /**
-     * Method to free model from memory
-     */
+    * Method to free model from memory
+    */
     public void freeModel()
     {
         freeLlm();
         this.close();
-        evaluatedOnce.set(false);
     }
-
-
 }

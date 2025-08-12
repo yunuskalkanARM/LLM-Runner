@@ -65,6 +65,13 @@
     "destination": "junit-4.13.2.jar",
     "url": "https://repo1.maven.org/maven2/junit/junit/4.13.2/junit-4.13.2.jar",
     "sha256sum": "8e495b634469d64fb8acfa3495a065cbacc8a0fff55ce1e31007be4c16dc57d3"
+    },
+    {
+     "name": "Config Json",
+     "purpose": "Loading configs in JNI tests",
+     "destination":"json-20250107.jar",
+     "url": "https://repo1.maven.org/maven2/org/json/json/20250107/json-20250107.jar",
+     "sha256sum": "85d4c1ab192d3117fd02c7fff1ec0fe63ade45cf56def7fe950ef060cf06e99f"
     }
   ]
 }

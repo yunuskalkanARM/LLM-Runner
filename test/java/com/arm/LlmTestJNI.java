@@ -10,124 +10,70 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assume.assumeTrue;
 
+import org.json.JSONObject;
 import org.junit.Test;
 import org.junit.BeforeClass;
 
 import com.arm.Llm;
-import com.arm.LlmConfig;
-
 import java.io.*;
 import java.util.*;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.io.IOException;
 
 public class LlmTestJNI {
+
     private static final String modelDir = System.getProperty("model_dir");
     private static final String configFilePath = System.getProperty("config_file");
-    private static final String userConfigFilePath = System.getProperty("user_config_file");
-    private static final Map<String, String> variables = new HashMap<>();
-    private static int numThreads = 4;
-    private static String modelTag = "";
-    private static String userTag = "";
-    private static String endTag = "";
-    private static String modelPath = "";
-    private static String llmPrefix = "";
-    private static List<String> stopWords = new ArrayList<String>();
+    private static JSONObject configJson;
 
-    /**
-     * Instead of matching LLM's response to expected response,
-     * check whether the response contains the salient parts of expected response.
-     * Pass true to check match and false to assert absence of salient parts for negative tests.
-     */
-    private static void checkLlmMatch(String response, String expectedResponse, boolean checkMatch) {
-        boolean matches = response.contains(expectedResponse);
-        if (checkMatch) {
-            assertTrue("Response mismatch: response={" + response + "} should contain={" + expectedResponse + "}", matches);
+    private void checkLlmMatch(String response, String expected, boolean shouldContain) {
+        if (shouldContain) {
+            assertTrue("Expected response to contain: " + response, response.contains(expected));
         } else {
-            assertFalse("Response mismatch: response={" + response + "} shouldn't contain={" + expectedResponse + "}", matches);
-        }
-    }
-
-    /**
-     * Loads variables from the specified configuration file.
-     *
-     * @param filePath Path to the configuration file.
-     * @throws IOException If an I/O error occurs.
-     */
-    private static void loadVariables(String filePath) throws IOException {
-        try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
-            String line;
-            while ((line = br.readLine()) != null) {
-                if (!line.contains("=")) continue;
-                String[] parts = line.split("=", 2);
-                if (parts[0].trim().equals("stopWords")) {
-                    stopWords.clear(); // Ensure no duplicates on reloading
-                    stopWords.addAll(Arrays.asList(parts[1].split(",")));
-                } else {
-                    variables.put(parts[0].trim(), parts[1].trim());
-                }
-            }
-        } catch (FileNotFoundException e) {
-            throw new IOException("Configuration file not found: " + filePath);
-        } catch (Exception e) {
-            throw new IOException("Error reading configuration file: " + e.getMessage());
+            assertFalse("Expected response to not contain: " + response, response.contains(expected));
         }
     }
 
     @BeforeClass
-    public static void classSetup() throws IOException {
-        if (modelDir == null) throw new RuntimeException("System property 'model_dir' is not set!");
-        if (configFilePath == null)
-            throw new RuntimeException("System property 'config_file' is not set!");
-
-        loadVariables(configFilePath);
-        modelTag = variables.get("modelTag");
-        userTag = variables.getOrDefault("userTag","");
-        endTag = variables.getOrDefault("endTag", "");
-        llmPrefix = variables.get("llmPrefix");
-        modelPath = modelDir + "/" + variables.get("llmModelName");
-        loadVariables(userConfigFilePath);
-        try{
-            numThreads = Integer.valueOf(variables.getOrDefault("numThreads","4"));
-         }
-         catch(NumberFormatException e){
-            System.out.println("Number of Threads parameter not found in UserConfiguration File");
-            numThreads = 4;
-         }
-
+    public static void classSetup() {
+        try {
+            String jsonContent = new String(Files.readAllBytes(Paths.get(configFilePath)));
+            configJson = new JSONObject(jsonContent);
+            configJson.put("llmModelName", modelDir + "/" + configJson.getString("llmModelName"));
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to load config JSON", e);
+        }
     }
-
-    @Test
-    public void testConfigLoading() {
-        LlmConfig llmConfig = new LlmConfig(modelTag, stopWords, modelPath, llmPrefix, userTag, endTag, numThreads);
-        assertTrue("Model tag is not empty", !llmConfig.getModelTag().isEmpty());
-        assertTrue("LLM prefix is not empty", !llmConfig.getLlmPrefix().isEmpty());
-        assertTrue("Stop words list is not empty", !llmConfig.getStopWords().isEmpty());
-    }
-
     @Test
     public void testLlmPrefixSetting() {
-        LlmConfig llmConfig = new LlmConfig(modelTag, stopWords, modelPath, llmPrefix, userTag, endTag, numThreads);
-        Llm llm = new Llm();
-        llm.llmInit(llmConfig);
 
-        String newModelTag = ("Ferdia:");
+
+        String newModelTag = "Ferdia:";
         String newPrefix = "Transcript of a dialog, where the User interacts with an AI Assistant named " + newModelTag +
                 ". " + newModelTag +
                 " is helpful, polite, honest, good at writing and answers honestly with a maximum of two sentences. User:";
+        String oldTag = configJson.getString("modelTag");
+        String oldPrefix = configJson.getString("llmPrefix");
 
-        llm.setLlmModelTag(newModelTag);
-        llm.setLlmPrefix(newPrefix);
-
+        configJson.put("modelTag",newModelTag);
+        configJson.put("llmPrefix",newPrefix);
+        Llm llm = new Llm();
+        llm.llmInit(configJson.toString());
         String question = "What is your name?";
         String response = llm.send(question);
         checkLlmMatch(response, "Ferdia", true);
         llm.freeModel();
+        // Revert the configJson to preserve original prefix and modelTag
+        configJson.put("modelTag",oldTag);
+        configJson.put("llmPrefix",oldPrefix);
+
     }
 
     @Test
     public void testInferenceWithContextReset() {
-        LlmConfig llmConfig = new LlmConfig(modelTag, stopWords, modelPath, llmPrefix, userTag, endTag, numThreads);
         Llm llm = new Llm();
-        llm.llmInit(llmConfig);
+        llm.llmInit(configJson.toString());
 
         String question1 = "What is the capital of the country, Morocco?";
         String response1 = llm.send(question1);
@@ -144,9 +90,8 @@ public class LlmTestJNI {
 
     @Test
     public void testInferenceWithoutContextReset() {
-        LlmConfig llmConfig = new LlmConfig(modelTag, stopWords, modelPath, llmPrefix, userTag, endTag, numThreads);
         Llm llm = new Llm();
-        llm.llmInit(llmConfig);
+        llm.llmInit(configJson.toString());
 
         String question1 = "What is the capital of the country, Morocco?";
         String response1 = llm.send(question1);
@@ -157,12 +102,10 @@ public class LlmTestJNI {
         checkLlmMatch(response2, "Arabic", true);
         llm.freeModel();
     }
-
     @Test
     public void testInferenceHandlesEmptyQuestion() {
-        LlmConfig llmConfig = new LlmConfig(modelTag, stopWords, modelPath, llmPrefix, userTag, endTag, numThreads);
         Llm llm = new Llm();
-        llm.llmInit(llmConfig);
+        llm.llmInit(configJson.toString());
 
         String question1 = "What is the capital of the country, Morocco?";
         String response1 = llm.send(question1);
@@ -183,9 +126,8 @@ public class LlmTestJNI {
     @Test
     public void testMangoSubtractionLongConversation() {
 
-        LlmConfig llmConfig = new LlmConfig(modelTag, stopWords, modelPath, llmPrefix, userTag, endTag, numThreads);
-        Llm llm = new Llm();
-        llm.llmInit(llmConfig);
+       Llm llm = new Llm();
+       llm.llmInit(configJson.toString());
 
         // 35 was determined to be upper limit for storing context but to avoid excessively long test runtime we cap at 20
         int originalMangoes = 5;
@@ -231,15 +173,8 @@ public class LlmTestJNI {
     @Test
     public void testInferenceRecoversAfterContextReset() {
         // Get model directory and config file path from system properties
-        String modelDir = System.getProperty("model_dir");
-        String configFilePath = System.getProperty("config_file");
-        if (modelDir == null || configFilePath == null) {
-            throw new RuntimeException("System properties for model_dir or config_file are not set!");
-        }
-
-        LlmConfig llmConfig = new LlmConfig(modelTag, stopWords, modelPath, llmPrefix, userTag, endTag, numThreads);
-        Llm llm = new Llm();
-        llm.llmInit(llmConfig);
+       Llm llm = new Llm();
+       llm.llmInit(configJson.toString());
 
         // First Question
         String question1 = "What is the capital of the country, Morocco?";
@@ -264,4 +199,5 @@ public class LlmTestJNI {
         checkLlmMatch(response4, "French", true);
         llm.freeModel();
     }
+
 }

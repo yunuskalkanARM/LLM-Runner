@@ -8,30 +8,21 @@
 #include "catch.hpp"
 
 #include "LlmImpl.hpp"
-#include "LlmUtils.hpp"
-
 #include <sstream>
 
 // Function to create the configuration file from CONFIG_FILE_PATH
-std::vector<std::string> GetTestConfigStopWords(LlmConfig& configTest)
+void SetupTestConfig(std::stringstream& stopWordsStream,
+                     LlmConfig* configTest)
 {
     std::string configFilePath     = CONFIG_FILE_PATH;
-    std::string userConfigFilePath = USER_CONFIG_FILE_PATH;
-    auto config                    = Llm::Test::Utils::LoadConfig(configFilePath);
-    std::stringstream stopWordsStream;
-    stopWordsStream << config["stopWords"];
-    std::string word;
-    std::vector<std::string> STOP_WORDS;
-    while (std::getline(stopWordsStream, word, ',')) {
-        STOP_WORDS.push_back(word);
-    }
+    std::ifstream configFile(configFilePath);
+    std::stringstream buffer;
+    buffer << configFile.rdbuf();  // Read file into stringstream
+    std::string jsonContent = buffer.str();
+    *configTest = LlmConfig(jsonContent);
     std::string testModelsDir = TEST_MODELS_DIR;
-    std::string modelPath     = testModelsDir + "/" + config["llmModelName"];
-    config["modelPath"]       = modelPath;
-    auto userConfig           = Llm::Test::Utils::LoadUserConfig(userConfigFilePath);
-    configTest               = Llm::Test::Utils::GetConfig(config, userConfig);
-    configTest.SetModelPath(modelPath);
-    return STOP_WORDS;
+    std::string modelPath     = testModelsDir + "/" + configTest->GetModelPath();
+    configTest->SetModelPath(modelPath);
 }
 /**
  * Simple query->response test
@@ -41,41 +32,24 @@ std::vector<std::string> GetTestConfigStopWords(LlmConfig& configTest)
 TEST_CASE("Test Llm-Wrapper class")
 {
     LlmConfig configTest{};
-    auto stopWords = GetTestConfigStopWords(configTest);
+    std::stringstream stopWordsStream;
+    SetupTestConfig(stopWordsStream, &configTest);
 
-    std::string response;
-    std::string question         = configTest.GetUserTag() +"What is the capital of France?" +
-                                   configTest.GetEndTag() + configTest.GetModelTag();
-    std::string prefixedQuestion = configTest.GetLlmPrefix() + question;
+    std::string question         = "What is the capital of France?" ;
     LLM llm;
 
     SECTION("Simple Query Response")
     {
+        std::string response;
         llm.LlmInit(configTest);
-        llm.Encode(prefixedQuestion);
-        bool stop = false;
-        REQUIRE(!stopWords.empty());
-        size_t t_maxWordLength = std::max_element(
-            stopWords.begin(), stopWords.end(),
-            [](auto const& a, auto const& b){
-                return a.size() < b.size();
-            }
-        )->size();
-        std::string t_tokenCache, t_breakWord;
-
+        llm.Encode(question);
         while (llm.GetChatProgress() < 100) {
             std::string s = llm.NextToken();
-            t_tokenCache += s;
-            response += s;
-            if(Llm::Test::Utils::ContainsStopWord(t_tokenCache, stopWords, t_breakWord)) {
-                size_t pos = response.find(t_breakWord);
-                response.erase(pos);
+            if (s==llm.endToken)
                 break;
-            }
-            if(t_tokenCache.size() > t_maxWordLength) {
-                t_tokenCache.erase(0, t_tokenCache.size() - t_maxWordLength);
-            }
+            response += s;
         }
+        std::cout<<"response is"<<response<<std::endl;
         CHECK(response.find("Paris") != std::string::npos);
     }
 

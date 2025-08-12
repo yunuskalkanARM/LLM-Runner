@@ -7,17 +7,33 @@
 #ifndef ARM_LLM_HPP
 #define ARM_LLM_HPP
 
+
 #include "LlmConfig.hpp"
 #include <memory>
+#include <atomic>
 
 /**
  * @class LLM
  * @brief Interface class for interacting with a Large Language Model.
  */
 class LLM {
+
+public:
+
+    /**
+     * The token used to signify the end of a response or generation.
+     */
+    const std::string endToken{"<eos>"};
+
 private:
+    LlmConfig m_config;
     class LLMImpl;
     std::unique_ptr<LLMImpl> m_impl{};
+    std::atomic<bool> m_evaluatedOnce{false};
+    std::string m_streamEndFlag;
+    std::string m_tokenBuffer;
+    int m_maxStopWordLength{};
+    bool m_stopFlag{};
 
 public:
     LLM();  /**< Constructor */
@@ -97,6 +113,19 @@ public:
      * @return string framework type
      */
     std::string GetFrameworkType();
+private:
+    /**
+    * Method to format prompt into a style model understands conversation
+    * @param prompt raw prompt string
+    * @return formatted query
+    */
+    std::string QueryBuilder(std::string &prompt);
+    /**
+     * Method to detect stop words in internal token buffer and emit correct output
+     * @return token string up to stop word, end token, or partial output
+     */
+    std::string ContainsStopWord();
+
 };
 
 #endif /* ARM_LLM_HPP */

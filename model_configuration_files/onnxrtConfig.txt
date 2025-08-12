@@ -1,6 +1,0 @@
-modelTag=<|assistant|>
-userTag=<|user|>
-endTag=<|end|>
-llmPrefix=<|system|>Transcript of a dialog, where the User interacts with an AI Assistant named Orbita. Orbita is helpful, polite, honest, good at writing and answers honestly with a maximum of two sentences<|end|>
-stopWords=Orbita:,User:,User,AI:,<|user|>,Assistant:,<|assistant|>,<|end|>,user:,[end of text],<|endoftext|>,model:,Question:,Consider the following scenario:\n
-llmModelName=onnxruntime-genai

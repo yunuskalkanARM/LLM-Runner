@@ -22,13 +22,12 @@ endif()
 
 message(STATUS "Adding C++ tests")
 add_executable(llm-cpp-tests
-    ${CMAKE_CURRENT_SOURCE_DIR}/cpp/LlmUtils.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/cpp/LlmTest.cpp)
+        ${CMAKE_CURRENT_SOURCE_DIR}/cpp/LlmTest.cpp)
 
 if (${LLM_FRAMEWORK} STREQUAL "llama.cpp")
-    set(CONFIG_FILE_NAME "llamaConfig.txt" CACHE STRING "Path to the Llama config file")
+    set(CONFIG_FILE_NAME "llamaConfig.json" CACHE STRING "Path to the Llama config file")
 elseif (${LLM_FRAMEWORK} STREQUAL "onnxruntime-genai")
-    set(CONFIG_FILE_NAME "onnxrtConfig.txt" CACHE STRING "Path to the ONNX Runtime GenAI config file")
+    set(CONFIG_FILE_NAME "onnxrtConfig.json" CACHE STRING "Path to the ONNX Runtime GenAI config file")
 endif ()
 
 
@@ -58,8 +57,6 @@ target_include_directories(llm-cpp-tests PUBLIC ${CATCH_DIR})
 enable_testing()
 add_test(NAME llm-cpp-ctest COMMAND llm-cpp-tests)
 
-set(USER_CONFIG_FILE_NAME "LLMUserConfig.txt")
-
 set(CONFIG_FILE_SOURCE "${CMAKE_SOURCE_DIR}/model_configuration_files/${CONFIG_FILE_NAME}")
 set(CONFIG_FILE_DEST "${CMAKE_BINARY_DIR}/${CONFIG_FILE_NAME}")
 
@@ -71,18 +68,6 @@ configure_file(${CONFIG_FILE_SOURCE} ${CONFIG_FILE_DEST} COPYONLY)
 
 target_compile_definitions(llm-cpp-tests
         PUBLIC CONFIG_FILE_PATH="${CONFIG_FILE_DEST}")
-
-set(USER_CONFIG_FILE_SOURCE "${CMAKE_SOURCE_DIR}/model_configuration_files/${USER_CONFIG_FILE_NAME}")
-set(USER_CONFIG_FILE_DEST "${CMAKE_BINARY_DIR}/${USER_CONFIG_FILE_NAME}")
-
-if(NOT EXISTS ${USER_CONFIG_FILE_SOURCE})
-    message(FATAL_ERROR "Configuration file not found: ${USER_CONFIG_FILE_SOURCE}")
-endif()
-
-configure_file(${USER_CONFIG_FILE_SOURCE} ${USER_CONFIG_FILE_DEST} COPYONLY)
-
-target_compile_definitions(llm-cpp-tests
-        PUBLIC USER_CONFIG_FILE_PATH="${USER_CONFIG_FILE_DEST}")
 
 # If JNI libs are being built, add tests for these here.
 if(TARGET arm-llm-jni)

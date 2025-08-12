@@ -264,7 +264,6 @@ std::string LLM::LLMImpl::CompletionLoop()
     if (llama_decode(this->m_llmContext, batch) != 0) {
         LOG_INF("llama_decode() failed");
     }
-
     // Synchronize llama to remove idle time between function calls
     llama_synchronize(this->m_llmContext);
     ++this->m_nCur;

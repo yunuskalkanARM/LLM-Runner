@@ -14,3 +14,6 @@ add_library(arm-llm-config STATIC
 
 target_include_directories(arm-llm-config PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR})
+
+include(find_json)
+target_link_libraries(arm-llm-config PUBLIC nlohmann_json::nlohmann_json)
