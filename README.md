@@ -80,6 +80,7 @@ provided configuration options. CMake presets are available to use and set the f
   when downloading resources. This is a one-time download that CMake configuration will initiate unless it
   has been run by the user directly or another prior CMake configuration. The lock prevents multiple CMake
   configuration processes running in parallel downloading files to the same location.
+- `LLM_LOG_LEVEL` Choose appropriate logging level ("ERROR","WARN","INFO","DEBUG") with this flag, if  LLM_LOG_LEVEL is not provided, it will be inferred from the CMAKE-BUILD-TYPE.
 
 ### Conditional options
 
@@ -212,7 +213,7 @@ cmake -B build --preset=native-release-with-tests
 cmake --build ./build
 ```
 ### To build for Android
-For Android™ build, ensure the `NDK_PATH` is set to installed Android™ NDK, specify Android™ ABI and platform if required or use a default preset e.g. android-arm64-release-kleidi-on-v82a-dotprod-i8mm
+For Android™ build, ensure the `NDK_PATH` is set to installed Android™ NDK, specify Android™ ABI and platform if required or use a default preset e.g. android-arm64-release-kleidi-on-v82a-dotprod-i8mm. 
 ```shell
 cmake -B build \
     -DCMAKE_TOOLCHAIN_FILE=${NDK_PATH}/build/cmake/android.toolchain.cmake \

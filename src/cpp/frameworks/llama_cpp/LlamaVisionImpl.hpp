@@ -10,13 +10,14 @@
 #include <cstdlib>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
-#include "log.h"
 #include "mtmd.h"
 #include "mtmd-helper.h"
 #include "sampling.h"
 #include "LlamaTextImpl.hpp"
+#include "Logger.hpp"
 
 /**
  * @brief Application context for multimodal (text + vision) inference using llama.cpp and MTMD.
@@ -70,12 +71,12 @@ struct mtmd_app_context {
               batch(llama_batch_init(params.n_batch, 0, 1)),
               n_batch(params.n_batch) {
         if (!lctx) {
-            throw std::runtime_error(std::string("Error initialising multimodal app context. "
-                                                 "llama_context is null."));
+            THROW_ERROR("Error initialising multimodal app context. "
+                                                 "llama_context is null.");
         }
         if (!model) {
-            throw std::runtime_error(std::string("Error initialising multimodal app context. "
-                                                 "llama_model is null."));
+            THROW_ERROR("Error initialising multimodal app context. "
+                                                 "llama_model is null.");
         }
 
         init_vision_context(params);
@@ -99,14 +100,18 @@ struct mtmd_app_context {
         mparams.use_gpu    = params.mmproj_use_gpu;
         mparams.print_timings = true;
         mparams.n_threads  = params.cpuparams.n_threads;
-        mparams.verbosity  = (params.verbosity > 0)
-                             ? GGML_LOG_LEVEL_DEBUG
-                             : GGML_LOG_LEVEL_INFO;
-
+        //we are mapping LLM_LOG_LEVEL to GGML_LOG_LEVEL
+        std::unordered_map<int,ggml_log_level> log_mapping{
+            {0,GGML_LOG_LEVEL_ERROR},
+            {1,GGML_LOG_LEVEL_WARN},
+            {2,GGML_LOG_LEVEL_INFO},
+            {3,GGML_LOG_LEVEL_DEBUG},
+            {4,GGML_LOG_LEVEL_NONE}
+        };
+        mparams.verbosity = log_mapping[ACTIVE_LOG_LEVEL];
         ctx_vision.reset(mtmd_init_from_file(clip_path.c_str(), model, mparams));
         if (!ctx_vision) {
-            LOG_ERR("Failed to load vision model from %s", clip_path.c_str());
-            std::exit(EXIT_FAILURE);
+            THROW_ERROR("Failed to load vision model from %s", clip_path.c_str());
         }
     }
 };

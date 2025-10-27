@@ -6,6 +6,8 @@
 #ifndef LLM_IMPL_HPP
 #define LLM_IMPL_HPP
 
+#include <unordered_map>
+
 #include "Llm.hpp"
 #include "LlmConfig.hpp"
 
@@ -170,6 +172,16 @@ private:
     double m_totalEncoderTime = {0.0};
     // Configuration for model
     LlmConfig m_config;
+
+
+    // Map llm-log-level to Onnx log severity level
+    std::unordered_map<int,int> m_onnxLogMap{
+        {/*LLM_LOG_ERROR*/   0 , /*ORT_LOGGING_LEVEL_ERROR*/ 3},
+        {/*LLM_LOG_WARN*/    3 ,/*ORT_LOGGING_LEVEL_WARN*/   2},
+        {/*LLM_LOG_INFO*/    2 ,/*ORT_LOGGING_LEVEL_INFO*/   1},
+        {/*LLM_LOG_DEBUG*/   3 ,/*ORT_LOGGING_LEVEL_DEBUG*/  0},
+        {/*LLM_LOG_VERBOSE*/ 4 ,/*ORT_LOGGING_LEVEL_DEBUG*/  0}
+    };
 
     // Flag indicating whether this is starting of the conversation (used to decide if the system prompt should be encoded)
     bool m_isConversationStart{true};

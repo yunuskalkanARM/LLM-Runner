@@ -6,7 +6,6 @@
 
 #pragma once
 #include "LlmConfig.hpp"
-
 #include <atomic>
 #include <memory>
 #include <string>

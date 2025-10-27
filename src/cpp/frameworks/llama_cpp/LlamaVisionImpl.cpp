@@ -5,6 +5,7 @@
 //
 
 #include "LlamaVisionImpl.hpp"
+#include "Logger.hpp"
 
 #include <stdexcept>
 #include <string>
@@ -22,14 +23,14 @@ void LlamaVisionImpl::NewSampler() {
 
     auto sampler = common_sampler_init(this->m_mtmdContext->model, sampling);
     if (!sampler) {
-        throw std::runtime_error("NewSampler failed: sampler init returned null");
+        THROW_ERROR("NewSampler failed: sampler init returned null");
     }
 
     this->m_commonParams.sampling = sampling;
     this->m_commonSampler = sampler;
 
     if (!this->m_commonSampler) {
-        throw std::runtime_error("New Sampler failed: sampler init returned null");
+        THROW_ERROR("New Sampler failed: sampler init returned null");
     }
 }
 
@@ -49,19 +50,18 @@ void LlamaVisionImpl::FreeLlm() {
     this->m_llmInitialized = false;
 }
 
-
 void LlamaVisionImpl::LlmInit(const LlmConfig& config, std::string sharedLibraryPath) {
 
     ggml_backend_load_all_from_path(sharedLibraryPath.c_str());
-
     if (config.GetNumThreads() <= 0) {
-        throw std::invalid_argument("NumThreads must be > 0");
+        THROW_INVALID_ARGUMENT("NumThreads must be > 0");
     }
     if (config.GetBatchSize() <= 0) {
-        throw std::invalid_argument("BatchSize must be > 0");
+        THROW_INVALID_ARGUMENT("BatchSize must be > 0");
     }
 
     try {
+        llama_log_set(llama_llm_log_callback, nullptr);
         this->m_config = config;
         this->m_batchSz = this->m_config.GetBatchSize();
         this->m_systemPrompt = this->m_config.GetSystemPrompt();
@@ -75,10 +75,9 @@ void LlamaVisionImpl::LlmInit(const LlmConfig& config, std::string sharedLibrary
         this->m_llmInitialized = true;
 
     } catch (const std::exception& e) {
-        throw std::runtime_error(
-                std::string("Llama initialization failed: ") + e.what() + "\n"
-        );
+        THROW_ERROR("Llama initialization failed: %s",  e.what());
     }
+    LOG_INF("Llama MMTD-Model initialized successfully");
 }
 
 void LlamaVisionImpl::ResetVisionContext() {
@@ -97,7 +96,7 @@ void LlamaVisionImpl::LoadModel()
     const auto& model  = this->m_config.GetModelPath();
 
     if (mmproj.empty() || model.empty()) {
-        throw std::invalid_argument("LoadModel error: modelPath or mmprojPath is empty");
+        THROW_INVALID_ARGUMENT("LoadModel error: modelPath or mmprojPath is empty");
     }
 
     // Just assign directly (keep it simple)
@@ -151,8 +150,7 @@ void LlamaVisionImpl::Encode(const LLM::EncodePayload& payload) {
     );
 
     if (evalFailed) {
-        LOG_ERR("Failed to evaluate multimodal prompt\n");
-        return;
+        THROW_ERROR("Encode: Failed to evaluate multimodal prompt");
     }
 
     llama_synchronize(this->m_llmContext);
@@ -185,7 +183,7 @@ std::string LlamaVisionImpl::NextToken() {
 
     // Decode and log any errors
     if (llama_decode(this->m_mtmdContext->lctx, this->m_mtmdContext->batch)) {
-        LOG_ERR("Failed to decode token\n");
+        THROW_ERROR("Failed to decode token");
         return "";
     }
 
@@ -205,7 +203,7 @@ size_t LlamaVisionImpl::GetChatProgress() const {
 void LlamaVisionImpl::NewContext() {
 
     if (this->m_nCtx <= 0) {
-        throw std::invalid_argument("Context length cannot be less than one");
+        THROW_INVALID_ARGUMENT("Context length cannot be less than one");
     }
 
     auto params = this->m_commonParams;
@@ -217,14 +215,14 @@ void LlamaVisionImpl::NewContext() {
     auto ctx = std::make_unique<mtmd_app_context>(params);
 
     if (!ctx->ctx_vision) {
-        throw std::runtime_error("NewContext failed: unable to create vision context");
+        THROW_ERROR("NewContext failed: unable to create vision context");
     }
     if (!ctx->lctx) {
-        throw std::runtime_error("NewContext failed: unable to create text context");
+        THROW_ERROR("NewContext failed: unable to create text context");
     }
 
     if (!ctx->model) {
-        throw std::runtime_error("NewContext failed: unable to create text model");
+        THROW_ERROR("NewContext failed: unable to create text model");
     }
 
     this->m_commonParams   = params;

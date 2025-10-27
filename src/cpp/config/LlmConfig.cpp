@@ -7,13 +7,15 @@
 #include <stdexcept>
 #include <nlohmann/json.hpp>
 
+#include "Logger.hpp"
+
 LlmConfig::LlmConfig(const std::string& jsonStr)
 {
     nlohmann::json modelConfig;
     try {
         modelConfig = nlohmann::json::parse(jsonStr);
     } catch (const std::exception& e) {
-        throw std::invalid_argument(std::string("Invalid JSON input: ") + e.what());
+        THROW_INVALID_ARGUMENT("Invalid JSON input: %s", e.what());
     }
 
     m_isDefaultTemplate = modelConfig.value("applyDefaultChatTemplate", false);
@@ -24,9 +26,10 @@ LlmConfig::LlmConfig(const std::string& jsonStr)
     m_userTemplate   = tmpl.value("userTemplate",   "%s");
 
     if (!modelConfig.contains("llmModelName")) {
-        throw std::runtime_error("Missing required parameter: modelPath");
+        THROW_INVALID_ARGUMENT("Missing required parameter: modelPath");
     }
     m_modelPath = modelConfig["llmModelName"];
+
     m_framework = modelConfig.value("framework", "");
     m_systemPrompt = modelConfig.value("systemPrompt", "");
 
@@ -34,14 +37,14 @@ LlmConfig::LlmConfig(const std::string& jsonStr)
 
     if (!modelConfig.contains("stopWords") || !modelConfig["stopWords"].is_array() || modelConfig["stopWords"].empty() )
     {
-        throw std::invalid_argument("Missing 'stopWords' key or invalid 'stopWords', stopWords must be a non-empty array.");
+        THROW_INVALID_ARGUMENT("Missing 'stopWords' key or invalid 'stopWords', stopWords must be a non-empty array.");
     }
 
     std::vector<std::string> parsedStopWords;
 
     for (const auto& val : modelConfig["stopWords"]) {
         if (!val.is_string() || val.get<std::string>().empty()) {
-            throw std::invalid_argument("All stopWords must be non-empty strings.");
+            THROW_INVALID_ARGUMENT("All stopWords must be non-empty strings.");
         }
         parsedStopWords.emplace_back(val.get<std::string>());
     }
@@ -49,16 +52,15 @@ LlmConfig::LlmConfig(const std::string& jsonStr)
     std::vector<std::string> parsedInputModalities;
     for (const auto& val : modelConfig["inputModalities"]) {
         if (!val.is_string() || val.get<std::string>().empty()) {
-            throw std::invalid_argument("All input modalities must be non-empty strings.");
+            THROW_INVALID_ARGUMENT("All input modalities must be non-empty strings.");
         }
         parsedInputModalities.emplace_back(val.get<std::string>());
     }
 
-
     std::vector<std::string> parsedOutputModalities;
     for (const auto& val : modelConfig["outputModalities"]) {
         if (!val.is_string() || val.get<std::string>().empty()) {
-            throw std::invalid_argument("All input modalities must be non-empty strings.");
+            THROW_INVALID_ARGUMENT("All output modalities must be non-empty strings.");
         }
         parsedOutputModalities.emplace_back(val.get<std::string>());
     }
@@ -69,7 +71,7 @@ LlmConfig::LlmConfig(const std::string& jsonStr)
 
     if(Contains(parsedInputModalities, "image")) {
         if(!modelConfig.contains("llmMmProjModelName")) {
-            throw std::runtime_error("Missing required parameter: llmMmProjModelName");
+            THROW_ERROR("Missing required parameter: llmMmProjModelName");
         }
         m_mmProjModelPath = modelConfig["llmMmProjModelName"];
     }
@@ -157,7 +159,7 @@ void LlmConfig::SetSystemPrompt(const std::string& systemPrompt)
 void LlmConfig::SetNumThreads(int threads)
 {
     if (threads <= 0) {
-        throw std::invalid_argument("number of threads must be a positive integer.");
+        THROW_INVALID_ARGUMENT("number of threads must be a positive integer.");
     }
     this->m_numThreads = threads;
 }
@@ -165,7 +167,7 @@ void LlmConfig::SetNumThreads(int threads)
 void LlmConfig::SetBatchSize(int batchSz)
 {
     if (batchSz <= 0) {
-        throw std::invalid_argument("batch-size must be a positive integer.");
+        THROW_INVALID_ARGUMENT("batch-size must be a positive integer.");
     }
     this->m_batchSize = batchSz;
 }
@@ -173,7 +175,7 @@ void LlmConfig::SetBatchSize(int batchSz)
 void LlmConfig::SetStopWords(const std::vector<std::string>& stopWords)
 {
     if (stopWords.empty()) {
-        throw std::invalid_argument("Stop words must not be empty.");
+        THROW_INVALID_ARGUMENT("Stop words must not be empty.");
     }
     this->m_stopWords = stopWords;
 }
@@ -181,7 +183,7 @@ void LlmConfig::SetStopWords(const std::vector<std::string>& stopWords)
 void LlmConfig::SetInputModalities(const std::vector<std::string>& inputModalities)
 {
     if (inputModalities.empty()) {
-        throw std::invalid_argument("Input Modalities must not be empty.");
+        THROW_INVALID_ARGUMENT("Input Modalities must not be empty.");
     }
     this->m_inputModalities = inputModalities;
 }
@@ -189,7 +191,7 @@ void LlmConfig::SetInputModalities(const std::vector<std::string>& inputModaliti
 void LlmConfig::SetOutputModalities(const std::vector<std::string>& outputModalities)
 {
     if (outputModalities.empty()) {
-        throw std::invalid_argument("Output Modalities must not be empty.");
+        THROW_INVALID_ARGUMENT("Output Modalities must not be empty.");
     }
     this->m_outputModalities = outputModalities;
 }

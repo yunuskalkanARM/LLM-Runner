@@ -5,12 +5,9 @@
 //
 #include "LlmImpl.hpp"
 #include <chrono>
+#include "Logger.hpp"
 #include <nlohmann/json.hpp>
 
-#define LOG_INF(...)                  \
-    do {                              \
-        fprintf(stdout, __VA_ARGS__); \
-    } while (0)
 
 using Clock = std::chrono::high_resolution_clock;
 using TimePoint = std::chrono::time_point<Clock>;
@@ -32,10 +29,10 @@ void LLM::LLMImpl::InitSequence()
     this->m_sequencesPtr = OgaSequences::Create();
 
     if (this->m_sequencesPtr == nullptr) {
-        throw std::runtime_error("Error: unable to init sequence");
+        THROW_ERROR("Error: unable to init sequence");
     }
 
-    LOG_INF("Seuqence Initialized\n");
+    LOG_INF("Seuqence Initialized");
 }
 
 void LLM::LLMImpl::FreeSequence()
@@ -43,7 +40,7 @@ void LLM::LLMImpl::FreeSequence()
     if (this->m_sequencesPtr) {
         this->m_sequencesPtr.reset();
         this->m_sequencesPtr = nullptr;
-        LOG_INF("Freed Sequences\n");
+        LOG_INF("Freed Sequences");
     }
 }
 
@@ -53,7 +50,7 @@ void LLM::LLMImpl::InitConfigs()
     this->m_llmConfigsPtr = OgaConfig::Create(this->m_modelPath.c_str());
 
     if (this->m_llmConfigsPtr == nullptr) {
-        throw std::runtime_error("Error: configs initialization failed");
+        THROW_ERROR("Error: configs initialization failed");
     }
 
     // This will fall back to default provider which is: CPU
@@ -63,19 +60,23 @@ void LLM::LLMImpl::InitConfigs()
     // Ref: https://github.com/microsoft/onnxruntime-genai/blob/79d1d8470b74564fc4e723312a476e692057b600/src/config.h#L64
     std::string patch =
         std::string(R"json({
-            "model": {
-                "decoder": {
-                "session_options": {
-                    "intra_op_num_threads": )json") + std::to_string(this->m_numOfThreads) +
-                R"json(,
-                    "inter_op_num_threads": 1
-                }
-                }
+          "model": {
+            "decoder": {
+              "session_options": {
+                "intra_op_num_threads": )json")
+        + std::to_string(this->m_numOfThreads)
+        + R"json(,
+                "inter_op_num_threads": 1,
+                "log_severity_level": )json"
+        + std::to_string(m_onnxLogMap[ACTIVE_LOG_LEVEL])
+        + R"json(
+              }
             }
-            })json";
+          }
+        })json";
 
     this->m_llmConfigsPtr->Overlay(patch.c_str());
-    LOG_INF("Configs Initialized\n");
+    LOG_INF("Configs Initialized");
 }
 
 void LLM::LLMImpl::FreeConfigs()
@@ -83,7 +84,7 @@ void LLM::LLMImpl::FreeConfigs()
     if (this->m_llmConfigsPtr) {
         this->m_llmConfigsPtr.reset();
         this->m_llmConfigsPtr = nullptr;
-        LOG_INF("Freed Configs\n");
+        LOG_INF("Freed Configs");
     }
 }
 
@@ -92,7 +93,7 @@ void LLM::LLMImpl::InitGenerator()
     this->m_llmGntParamsPtr = OgaGeneratorParams::Create(* this->m_llmModelPtr);
 
     if (this->m_llmGntParamsPtr == nullptr) {
-        throw std::runtime_error("Error: generator params initialization failed");
+        THROW_ERROR("Error: generator params initialization failed");
     }
 
     this->m_llmGntParamsPtr->SetSearchOption("max_length", this->m_nCtx);
@@ -105,10 +106,9 @@ void LLM::LLMImpl::InitGenerator()
     this->m_llmGeneratorPtr = OgaGenerator::Create(* this->m_llmModelPtr, * this->m_llmGntParamsPtr);
 
     if (this->m_llmGeneratorPtr == nullptr) {
-        throw std::runtime_error("Error: generator initialization failed. Unable to create ONNX generator");
+        THROW_ERROR("Error: generator initialization failed. Unable to create ONNX generator");
     }
-
-    LOG_INF("Generator Initialized\n");
+    LOG_INF("Generator Initialized");
 }
 
 void LLM::LLMImpl::FreeGenerator()
@@ -119,7 +119,7 @@ void LLM::LLMImpl::FreeGenerator()
 
         this->m_llmGeneratorPtr.reset();
         this->m_llmGeneratorPtr = nullptr;
-        LOG_INF("Freed Generator\n");
+        LOG_INF("Freed Generator");
     }
 }
 
@@ -128,17 +128,17 @@ void LLM::LLMImpl::InitTokenizer()
     this->m_tokenizerPtr = OgaTokenizer::Create(*this->m_llmModelPtr);
 
     if (this->m_tokenizerPtr == nullptr) {
-        throw std::runtime_error("Error: tokenizer initialization failed");
+        THROW_ERROR("Error: tokenizer initialization failed");
     }
 
     this->m_tokenizerStreamPtr = OgaTokenizerStream::Create(*this->m_tokenizerPtr);
 
     if (this->m_tokenizerStreamPtr == nullptr) {
-        throw std::runtime_error("Error: tokenizer stream initialization failed");
+        THROW_ERROR("Error: tokenizer stream initialization failed");
     }
 
-    LOG_INF("Tokenizer Initialized\n");
-    LOG_INF("Tokenizer Stream Initialized\n");
+    LOG_INF("Tokenizer Initialized");
+    LOG_INF("Tokenizer Stream Initialized");
 }
 
 void LLM::LLMImpl::FreeTokenizer()
@@ -149,7 +149,7 @@ void LLM::LLMImpl::FreeTokenizer()
 
         this->m_tokenizerStreamPtr.reset();
         this->m_tokenizerStreamPtr = nullptr;
-        LOG_INF("Freed Tokenizer\n");
+        LOG_INF("Freed Tokenizer");
     }
 }
 
@@ -158,10 +158,10 @@ void LLM::LLMImpl::LoadModel()
     this->m_llmModelPtr = OgaModel::Create(* this->m_llmConfigsPtr);
 
     if (this->m_llmModelPtr == nullptr) {
-        throw std::runtime_error("Error: unable to load model from " + std::string(this->m_modelPath));
+        THROW_ERROR("Error: unable to load model from " , this->m_modelPath.c_str());
     }
 
-    LOG_INF("Model Loaded\n");
+    LOG_INF("Model Loaded");
 }
 
 void LLM::LLMImpl::FreeModel()
@@ -169,7 +169,7 @@ void LLM::LLMImpl::FreeModel()
     if (this->m_llmModelPtr) {
         this->m_llmModelPtr.reset();
         this->m_llmModelPtr = nullptr;
-        LOG_INF("Freed Model\n");
+        LOG_INF("Freed Model");
     }
     this->ResetContext();
     this->m_llmInitialized = false;
@@ -193,7 +193,7 @@ void LLM::LLMImpl::LlmInit(const LlmConfig& config, std::string sharedLibraryPat
             LoadModel();
         }
         else {
-            LOG_INF("Config is not initialized\n");
+            LOG_WARN("Config is not initialized");
         }
 
         if (this->m_llmModelPtr != nullptr) {
@@ -202,7 +202,7 @@ void LLM::LLMImpl::LlmInit(const LlmConfig& config, std::string sharedLibraryPat
         }
 
         else {
-            LOG_INF("Model is not loaded\n");
+            LOG_INF("Model is not loaded");
         }
 
         if (this->m_llmConfigsPtr      != nullptr &&
@@ -217,10 +217,10 @@ void LLM::LLMImpl::LlmInit(const LlmConfig& config, std::string sharedLibraryPat
         }
 
     } catch (const std::exception& e) {
-        throw std::runtime_error("LLM initialization failed: " + std::string(e.what()));
+        THROW_ERROR("LLM initialization failed: %s", e.what());
     }
 
-    LOG_INF("LLM Initialized\n");
+    LOG_INF("LLM Initialized");
 }
 
 void LLM::LLMImpl::FreeLlm()
@@ -234,7 +234,7 @@ void LLM::LLMImpl::FreeLlm()
         FreeSequence();
         ResetTimings();
         this->m_llmInitialized = false;
-        LOG_INF("Freed Entire LLM\n");
+        LOG_INF("Freed Entire LLM");
     }
 }
 
@@ -244,7 +244,7 @@ void LLM::LLMImpl::ResetContext()
     this->m_isConversationStart = true;
     ResetTimings();
     this->m_contextFilled = 0;
-    LOG_INF("Reset Context\n");
+    LOG_INF("Reset Context");
 }
 
 std::string LLM::LLMImpl::QueryBuilder(EncodePayload& payload)
@@ -264,10 +264,9 @@ std::string LLM::LLMImpl::ApplyDefaultChatTemplate(const std::string& prompt)
     if (auto pos = userTurn.find(kPlaceholder); pos != std::string::npos) {
         userTurn.replace(pos, kPlaceholderSize, std::string(prompt));
     } else {
-        throw std::runtime_error(
-            "Placeholder not found in user template. Please include " + std::string(kPlaceholder) +
-            " in the 'userTemplate' section of the configuration file.");}
-
+        THROW_ERROR(
+            "Placeholder not found in user template. Please include %s in the 'userTemplate' section of the configuration file.",kPlaceholder);
+    }
     if (!this->m_isConversationStart) {
         return userTurn;
     }
@@ -278,10 +277,9 @@ std::string LLM::LLMImpl::ApplyDefaultChatTemplate(const std::string& prompt)
     if (auto pos = systemTurn.find(kPlaceholder); pos != std::string::npos) {
        systemTurn.replace(pos, kPlaceholderSize, std::string(this->m_systemPrompt));
     } else {
-        throw std::runtime_error(
-            "Placeholder not found in system template. Please include " + std::string(kPlaceholder) +
-            " in the 'systemTemplate' section of the configuration file.");}
-
+        THROW_ERROR(
+            "Placeholder not found in user template. Please include %s in the 'userTemplate' section of the configuration file.",kPlaceholder);
+    }
     return systemTurn + userTurn;
 }
 
@@ -313,44 +311,53 @@ std::string LLM::LLMImpl::ApplyAutoChatTemplate(const std::string& prompt)
 void LLM::LLMImpl::Encode(EncodePayload& payload)
 {
     std::string prompt = payload.textPrompt;
-    // Time start
-    TimePoint startTimeStampEncoder = Clock::now();
+    try {
+        // Time start
+        TimePoint startTimeStampEncoder = Clock::now();
 
-    InitSequence();
+        InitSequence();
 
-    this->m_tokenizerPtr->Encode(prompt.c_str(), * this->m_sequencesPtr);
-    this->m_llmGeneratorPtr->AppendTokenSequences(* this->m_sequencesPtr);
+        this->m_tokenizerPtr->Encode(prompt.c_str(), * this->m_sequencesPtr);
+        this->m_llmGeneratorPtr->AppendTokenSequences(* this->m_sequencesPtr);
 
-    // Record finishing time
-    this->m_totalEncoderTime += Duration(Clock::now() - startTimeStampEncoder).count();
-    this->m_totalEncodedTokens += this->m_sequencesPtr->SequenceCount(0);
+        // Record finishing time
+        this->m_totalEncoderTime += Duration(Clock::now() - startTimeStampEncoder).count();
+        this->m_totalEncodedTokens += this->m_sequencesPtr->SequenceCount(0);
+    }
+    catch (const std::exception& e) {
+        THROW_ERROR("Failed to evaluate prompt :%s",e.what());
+    }
 
 }
 
 std::string LLM::LLMImpl::NextToken()
 {
-    if(!this->m_llmGeneratorPtr->IsDone()) {
-        // Record starting time
-        TimePoint startTimeStampDecoder = Clock::now();
+    try {
+        if(!this->m_llmGeneratorPtr->IsDone()) {
+            // Record starting time
+            TimePoint startTimeStampDecoder = Clock::now();
 
-        this->m_llmGeneratorPtr->GenerateNextToken();
-        size_t cnt = this->m_llmGeneratorPtr->GetSequenceCount(0);
-        int32_t tok = this->m_llmGeneratorPtr->GetSequenceData(0)[cnt - 1];
-        auto out = this->m_tokenizerStreamPtr->Decode(tok);
+            this->m_llmGeneratorPtr->GenerateNextToken();
+            size_t cnt = this->m_llmGeneratorPtr->GetSequenceCount(0);
+            int32_t tok = this->m_llmGeneratorPtr->GetSequenceData(0)[cnt - 1];
+            auto out = this->m_tokenizerStreamPtr->Decode(tok);
 
-        // Record finishing time
-        this->m_totalDecoderTime += Duration(Clock::now() - startTimeStampDecoder).count();
-        this->m_totalDecodedTokens += 1;
+            // Record finishing time
+            this->m_totalDecoderTime += Duration(Clock::now() - startTimeStampDecoder).count();
+            this->m_totalDecodedTokens += 1;
 
-        size_t nCurr = this->m_llmGeneratorPtr->GetSequenceCount(0);
+            size_t nCurr = this->m_llmGeneratorPtr->GetSequenceCount(0);
 
-        this->m_contextFilled = 100 * nCurr / this->m_nCtx;
+            this->m_contextFilled = 100 * nCurr / this->m_nCtx;
 
-        return out;
+            return out;
+        }
+        else {
+            return this->m_eos;
+        }
     }
-
-    else {
-        return this->m_eos;
+    catch (const std::exception& e) {
+        THROW_ERROR("Failed to decode next token : %s",e.what());
     }
 }
 
@@ -377,7 +384,7 @@ void LLM::LLMImpl::ResetTimings()
     this->m_totalEncoderTime = 0;
     this->m_totalDecodedTokens = 0;
     this->m_totalEncodedTokens = 0;
-    LOG_INF("Reset Timings\n");
+    LOG_INF("Reset Timings");
 
 }
 

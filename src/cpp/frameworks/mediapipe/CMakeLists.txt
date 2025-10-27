@@ -70,16 +70,19 @@ if (NOT TARGET arm-llm-config)
     message(FATAL_ERROR "arm-llm-config target not defined")
 elseif (NOT TARGET arm-llm-interface)
     message(FATAL_ERROR "arm-llm-interface target not defined")
+elseif (NOT TARGET arm-llm-log)
+    message(FATAL_ERROR "arm-llm-log target not defined")
 endif()
 
 add_library(arm-llm-framework STATIC
         ${CMAKE_CURRENT_SOURCE_DIR}/MediaPipeImpl.cpp LlmFactory.cpp)
 
 target_include_directories(arm-llm-framework PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR})
+        ${CMAKE_CURRENT_SOURCE_DIR} )
 
 # List all libraries that we need to depend on here:
 target_link_libraries(arm-llm-framework PUBLIC
         mediapipe-engine-cpu
         arm-llm-config
-        arm-llm-interface)
+        arm-llm-interface
+        arm-llm-log)

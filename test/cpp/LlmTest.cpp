@@ -7,6 +7,7 @@
 
 
 #include "LlmImpl.hpp"
+#include "Logger.hpp"
 #include <sstream>
 #include <list>
 #include <iostream>
@@ -23,9 +24,9 @@
 #endif /* defined(DEPRECATED) */
 
 
-static std::string s_configFilePath;
-static std::string s_modelRootDir;
-static std::string s_backendSharedLibraryDir;
+std::string s_configFilePath{""};
+std::string s_modelRootDir{""};
+std::string s_backendSharedLibraryDir{""};
 
 static int maxTokenRetrievalAttempts = 10000;
 
@@ -53,7 +54,7 @@ int main(int argc, char* argv[])
     session.cli(cli);
 
     if (0 != session.applyCommandLine(argc, argv)) {
-        std::cerr << "Failed to parse command line options\n";
+        LOG_ERROR("Failed to parse command line options");
     }
 
     std::cout << "Config file: " << configFilePath;

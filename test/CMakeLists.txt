@@ -45,7 +45,8 @@ set(TEST_TARGET llm-cpp-tests)
 add_executable(${TEST_TARGET}
         ${CMAKE_CURRENT_SOURCE_DIR}/cpp/LlmTest.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/cpp/LlmImplFactoryTest.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/cpp/LlmConfigTest.cpp)
+        ${CMAKE_CURRENT_SOURCE_DIR}/cpp/LlmConfigTest.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/cpp/LlmLogTest.cpp)
 
 target_compile_definitions(${TEST_TARGET}
         PUBLIC

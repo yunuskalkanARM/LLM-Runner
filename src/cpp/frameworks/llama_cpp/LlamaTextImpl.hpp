@@ -145,7 +145,6 @@ protected:
     std::string m_userTemplate{""};           /**< Default template for user message. */
     std::string m_eos = "<|endoftext|>";      /**< Used as a general signal in our LLM module to terminate response. */
     LlmConfig m_config;                       /**< Configuration for model. */
-
     /**
      * @brief Function to load the chosen llama model to memory
      */
@@ -260,4 +259,13 @@ protected:
      * @return The prompt with the automatic chat template applied.
      */
     std::string ApplyAutoChatTemplate(const std::string& prompt);
+
+    /**
+     * We are using our Logging functions and overriding default ggml logging callback.
+     * @param level The ggml_log_level tag used by llama.cpp to identify whther it is ERROR,WARN or INFO
+     * @param text The full logging text including formatting information
+     * @param user_data The context for user to store extra details on logging.
+     */
+    static void llama_llm_log_callback(enum ggml_log_level level, const char * text, void * user_data);
+
 };

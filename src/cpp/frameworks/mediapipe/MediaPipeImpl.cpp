@@ -10,10 +10,8 @@
 #include <iostream>
 #include <filesystem>
 
-#define LOG_INF(...)                  \
-    do {                              \
-        fprintf(stdout, __VA_ARGS__); \
-    } while (0)
+#include "Logger.hpp"
+
 
 /**
  * @brief Mediapipe Implementation of our LLM API
@@ -31,7 +29,7 @@ std::string GetCacheDir() {
         std::filesystem::path working_dir = std::filesystem::current_path();
         return working_dir.string();
     } catch (const std::filesystem::filesystem_error& e) {
-        std::cerr << "Error getting current directory: " << e.what() << std::endl;
+        THROW_ERROR("Error getting current directory: %s" , e.what());
         return "";
     }
 }
@@ -47,7 +45,6 @@ std::string GetExtraStringPart(const std::string& resultString, const std::strin
 void LlmCallback(void* ctx, LlmResponseContext* response_context) {
     // Register as cpu_callback function inside Llm's Inference Engine
     auto* context = reinterpret_cast<CallbackContext*>(ctx);
-    std::string token(response_context->response_array[0]);
     context->m_asyncResponse += std::string(response_context->response_array[0]);
     context->m_nCur++;
     if (response_context->done) {
@@ -71,7 +68,7 @@ void LLM::LLMImpl::LoadEngine(const std::string& model_path, const std::string& 
     this->m_errorCode =
         LlmInferenceEngine_CreateEngine(&model_settings, &this->m_llmEngine, &this->m_errorMsg);
     if (this->m_errorCode) {
-        LOG_INF("Failed to create engine: %s", this->m_errorMsg);
+        LOG_ERROR("Failed to create engine: %s", this->m_errorMsg);
         free(this->m_errorMsg);
     }
 }
@@ -87,7 +84,7 @@ void LLM::LLMImpl::LoadSession()
     this->m_errorCode = LlmInferenceEngine_CreateSession(
         this->m_llmEngine, &session_config, &this->m_llmEngineSession, &this->m_errorMsg);
     if (this->m_errorCode) {
-        LOG_INF("Failed to load session: %s", this->m_errorMsg);
+        LOG_ERROR("Failed to load session: %s", this->m_errorMsg);
         free(this->m_errorMsg);
     }
 }
@@ -103,14 +100,13 @@ void LLM::LLMImpl::LlmInit(const LlmConfig& config, std::string sharedLibraryPat
         LoadEngine(modelPath, cache_dir);
 
         if (this->m_errorCode) {
-            throw std::runtime_error("Mediapipe Engine creation failed");
+            THROW_ERROR("Mediapipe Engine creation failed");
         }
 
         LoadSession();
         if (this->m_errorCode) {
-            throw std::runtime_error("Mediapipe Session creation failed");
+            THROW_ERROR("Mediapipe Session creation failed");
         }
-
         this->m_systemPrompt      = config.GetSystemPrompt();
         this->m_isDefaultTemplate = config.IsDefaultTemplate();
         this->m_systemTemplate    = config.GetSystemTemplate();
@@ -120,8 +116,9 @@ void LLM::LLMImpl::LlmInit(const LlmConfig& config, std::string sharedLibraryPat
         this->m_llmInitialized      = true;
         this->m_callbackContext.m_nCur = 0;
     } catch (const std::exception& e) {
-        throw std::runtime_error("LLM initialization failed: " + std::string(e.what()));
+        THROW_ERROR("LLM initialization failed: %s" , e.what());
     }
+    LOG_INF("Mediapipe Model initialized successfully");
 }
 
 std::string LLM::LLMImpl::ApplyAutoChatTemplate(const std::string& prompt)
@@ -140,9 +137,9 @@ std::string LLM::LLMImpl::ApplyDefaultChatTemplate(const std::string& prompt)
     if (auto pos = userTurn.find(kPlaceholder); pos != std::string::npos) {
         userTurn.replace(pos, kPlaceholderSize, std::string(prompt));
     } else {
-        throw std::runtime_error(
-            "Placeholder not found in user template. Please include " + std::string(kPlaceholder) +
-            " in the 'userTemplate' section of the configuration file.");}
+        THROW_ERROR(
+            "Placeholder not found in user template. Please include %s in the 'userTemplate' section of the configuration file.",kPlaceholder);
+    }
 
     if (!this->m_isConversationStart) {
         return userTurn;
@@ -154,9 +151,9 @@ std::string LLM::LLMImpl::ApplyDefaultChatTemplate(const std::string& prompt)
     if (auto pos = systemTurn.find(kPlaceholder); pos != std::string::npos) {
        systemTurn.replace(pos, kPlaceholderSize, std::string(this->m_systemPrompt));
     } else {
-        throw std::runtime_error(
-            "Placeholder not found in system template. Please include " + std::string(kPlaceholder) +
-            " in the 'systemTemplate' section of the configuration file.");}
+        THROW_ERROR(
+            "Placeholder not found in user template. Please include %s in the 'systemTemplate' section of the configuration file.",kPlaceholder);
+    }
 
     return systemTurn + userTurn;
 }
@@ -176,16 +173,18 @@ void LLM::LLMImpl::Encode(EncodePayload& prompt)
     this->m_errorCode  = LlmInferenceEngine_Session_AddQueryChunk(
         this->m_llmEngineSession, _query.c_str(), &this->m_errorMsg);
     if (this->m_errorCode) {
-        LOG_INF("Encoding failed: %s\n", this->m_errorMsg);
         free(this->m_errorMsg);
-        return;
+        THROW_ERROR("Encode: Failed to evaluate: %s", this->m_errorMsg);
     }
     this->m_conversationContext = _query;
     this->m_callbackContext.m_nCur =  LlmInferenceEngine_Session_SizeInTokens(this->m_llmEngineSession, _query.c_str(), &this->m_errorMsg);
     if (this->m_callbackContext.m_nCur < 0) {
         free(this->m_errorMsg);
-        throw std::runtime_error("Mediapipe Chat Progress Finder failed: \n");
+        LOG_ERROR("Mediapipe Chat Progress Finder failed:");
         return;
+    }
+    if (this->m_callbackContext.m_nCur >= this->m_nCtx) {
+        THROW_ERROR("Mediapipe encode- Failed to evaluate: Context is full" );
     }
     // clear response strings for synchronization
     this->m_callbackContext.m_asyncResponse.clear();
@@ -195,8 +194,7 @@ void LLM::LLMImpl::Encode(EncodePayload& prompt)
     this->m_errorCode = LlmInferenceEngine_Session_PredictAsync(
     this->m_llmEngineSession,&this->m_callbackContext, &this->m_errorMsg, LlmCallback);
     if (this->m_errorCode) {
-        LOG_INF("Retrieval of next token failed: %s\n", this->m_errorMsg);
-        free(this->m_errorMsg);
+        THROW_ERROR("Mediapipe predictAsync - Failed to decode token: %s", this->m_errorMsg);
     }
 }
 
@@ -253,7 +251,7 @@ int32_t LLM::LLMImpl::GetInitialPromptLength(const char* text)
         LlmInferenceEngine_Session_SizeInTokens(this->m_llmEngineSession, text, &this->m_errorMsg);
     if (nPrefix < 0) {
         free(this->m_errorMsg);
-        throw std::runtime_error("Mediapipe Prefix Length Finder failed: /n");
+        LOG_ERROR("Mediapipe Prefix Length Finder failed: %s", this->m_errorMsg);
         return -1;
     }
     return nPrefix;
@@ -267,7 +265,7 @@ void LLM::LLMImpl::ResetContext()
             this->m_callbackContext.m_nCur                = n_prefix;
             this->m_conversationContext = this->m_systemPrompt;
         } catch (const std::exception& e) {
-            LOG_INF("Context reset failed: %s", e.what());
+            LOG_ERROR("Context reset failed: %s", e.what());
         }
     } else {
         KVCacheClear();

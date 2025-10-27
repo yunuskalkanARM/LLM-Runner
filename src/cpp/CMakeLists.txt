@@ -9,6 +9,8 @@ project(arm-llm-cpp-prj
         DESCRIPTION "An LLM CPP library"
         LANGUAGES   C CXX ASM)
 
+add_subdirectory(log)
+
 # Add interface:
 add_subdirectory(interface)
 
@@ -26,7 +28,8 @@ add_library(arm-llm-cpp STATIC
 target_link_libraries(arm-llm-cpp PUBLIC
     arm-llm-interface
     arm-llm-config
-    arm-llm-framework)
+    arm-llm-framework
+    arm-llm-log)
 
 # If building with JNI support, build a separate
 # target to provide these bindings.

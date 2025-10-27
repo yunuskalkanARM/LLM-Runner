@@ -5,11 +5,8 @@
 //
 #include "LlamaTextImpl.hpp"
 #include "is_utf8.h"
+#include "Logger.hpp"
 
-#define LOG_INF(...)                  \
-    do {                              \
-        fprintf(stdout, __VA_ARGS__); \
-    } while (0)
 
 /**
  * @brief LLama Implementation of our LLM API
@@ -27,11 +24,11 @@ void LLM::LLMImpl::LoadModel()
     const llama_model_params model_params = llama_model_default_params();
     const std::string& modelPath = this->m_config.GetModelPath();
     if (modelPath.empty()) {
-        throw std::runtime_error("Model path supplied in config is empty");
+        THROW_ERROR("Model path supplied in config is empty");
     }
     this->m_llmModel                = llama_model_load_from_file(modelPath.c_str(), model_params);
     if (this->m_llmModel == nullptr) {
-        throw std::runtime_error("error: unable to load model from " + std::string(modelPath.c_str()));
+        THROW_ERROR("error: unable to load model from %s" , modelPath.c_str());
     }
 }
 
@@ -52,7 +49,7 @@ void LLM::LLMImpl::NewContext()
     ctx_params.no_perf              = false;
     this->m_llmContext              = llama_init_from_model(this->m_llmModel, ctx_params);
     if (this->m_llmContext == nullptr) {
-        throw std::runtime_error("NewContext failed: Unable to create llama context");
+        THROW_ERROR("NewContext failed: Unable to create llama context");
     }
 }
 
@@ -64,11 +61,35 @@ void LLM::LLMImpl::FreeContext()
     }
 }
 
+void LLM::LLMImpl::llama_llm_log_callback(enum ggml_log_level level, const char * text, void * user_data) {
+    // map the llama provided internal logs to LLM module style logs.
+    switch (level) {
+        case 1:
+            LOG_DEBUG("%s",text);
+            break;
+        case 2:
+            LOG_INF("%s",text);
+            break;
+        case 3:
+            LOG_WARN("%s",text);
+            break;
+        case 4:
+            LOG_ERROR("%s",text);
+            break;
+            // logs with GGML_LOG_LEVEL 0 and 5 are irrelevant in llama.cpp
+        default:
+            break;
+    }
+    (void) level;
+    (void) text;
+    (void) user_data;
+}
+
 void LLM::LLMImpl::LlmInit(const LlmConfig& config, std::string sharedLibraryPath)
 {
     ggml_backend_load_all_from_path(sharedLibraryPath.c_str());
     try {
-
+        llama_log_set(llama_llm_log_callback, nullptr);
         this->m_config = config;
         this->m_batchSz = this->m_config.GetBatchSize();
 
@@ -86,8 +107,9 @@ void LLM::LLMImpl::LlmInit(const LlmConfig& config, std::string sharedLibraryPat
         NewSampler();
         this->m_llmInitialized = true;
     } catch (const std::exception& e) {
-        throw std::runtime_error("Llama initialization failed: " + std::string(e.what()) + "/n");
+        THROW_ERROR("Llama model initialization failed: %s" ,e.what());
     }
+    LOG_INF("Llama initialized successfully");
 }
 
 void LLM::LLMImpl::FreeLlm()
@@ -200,7 +222,7 @@ std::string LLM::LLMImpl::ApplyAutoChatTemplate(const std::string& prompt)
 
     // if no template on the model, fall back to default implementation
     if (!tmpl) {
-        LOG_INF("ApplyAutoChatTemplate: no template found. Falling back to default template.\n");
+        LOG_INF("ApplyAutoChatTemplate: no template found. Falling back to default template.");
         return ApplyDefaultChatTemplate(prompt);
     }
 
@@ -231,7 +253,7 @@ std::string LLM::LLMImpl::ApplyAutoChatTemplate(const std::string& prompt)
     );
 
     if (requiredMemory < 0) {
-        LOG_INF("ApplyAutoChatTemplate failed. Falling back to default template\n");
+        LOG_INF("ApplyAutoChatTemplate failed. Falling back to default template");
         return ApplyDefaultChatTemplate(prompt);
     }
 
@@ -259,9 +281,9 @@ std::string LLM::LLMImpl::ApplyDefaultChatTemplate(const std::string& prompt)
     if (auto pos = userTurn.find(kPlaceholder); pos != std::string::npos) {
         userTurn.replace(pos, kPlaceholderSize, std::string(prompt));
     } else {
-        throw std::runtime_error(
-            "Placeholder not found in user template. Please include " + std::string(kPlaceholder) +
-            " in the 'userTemplate' section of the configuration file.");}
+        THROW_ERROR(
+            "Placeholder not found in user template. Please include %s in the 'userTemplate' section of the configuration file.",kPlaceholder);
+    }
 
     if (!this->m_isConversationStart) {
         return userTurn;
@@ -273,10 +295,9 @@ std::string LLM::LLMImpl::ApplyDefaultChatTemplate(const std::string& prompt)
     if (auto pos = systemTurn.find(kPlaceholder); pos != std::string::npos) {
        systemTurn.replace(pos, kPlaceholderSize, std::string(this->m_systemPrompt));
     } else {
-        throw std::runtime_error(
-            "Placeholder not found in system template. Please include " + std::string(kPlaceholder) +
-            " in the 'systemTemplate' section of the configuration file.");}
-
+        THROW_ERROR(
+            "Placeholder not found in user template. Please include %s in the 'systemTemplate' section of the configuration file.",kPlaceholder);
+    }
     return systemTurn + userTurn;
 }
 
@@ -296,11 +317,13 @@ void LLM::LLMImpl::Encode(const EncodePayload& payload)
 
     // check prompt size
     if (promptLength > this->m_nCtx - 4) {
-        fprintf(stderr, "%s: error: unable to Encode large prompt \n", __func__);
-    } else if (promptLength + this->m_nCur > this->m_nCtx - 4) {
-        fprintf(stdout, "%s: warning: unable to Encode prompt context full \n", __func__);
-    } else if (promptLength <= 1) {
-        fprintf(stderr, "%s: error: unable to Encode empty prompt \n", __func__);
+        LOG_WARN("%s: Failed to evaluate large prompt",__func__);
+    }
+    else if (promptLength + this->m_nCur > this->m_nCtx - 4) {
+        LOG_WARN("%s: Failed to evaluate current prompt, context full",__func__);
+    }
+    else if (promptLength <= 1) {
+        LOG_WARN("%s: Failed to evaluate empty prompt",__func__);
     } else {
         for (size_t idx = 0; idx < promptLength; idx += this->m_batchSz) {
             const size_t end_idx  = std::min(idx + this->m_batchSz, promptLength - 1);
@@ -331,8 +354,7 @@ void LLM::LLMImpl::CompletionInit(llama_tokens sub_tokens_list, bool lastBatch)
     }
 
     if (llama_decode(this->m_llmContext, batch) != 0) {
-        LOG_INF("llama_decode() failed");
-        return;
+        THROW_ERROR("llama_decode(): Failed to evaluate prompt");
     }
 
     llama_synchronize(this->m_llmContext);
@@ -366,7 +388,7 @@ std::string LLM::LLMImpl::CompletionLoop()
     common_batch_add(batch, new_token_id, this->m_nCur, {0}, true);
 
     if (llama_decode(this->m_llmContext, batch) != 0) {
-        LOG_INF("llama_decode() failed");
+        THROW_ERROR("llama_decode(): Failed to decode token");
     }
     // Synchronize llama to remove idle time between function calls
     llama_synchronize(this->m_llmContext);
@@ -407,7 +429,7 @@ std::string LLM::LLMImpl::BenchModel(int& prompts, int& eval_prompts, int& n_max
 
     int i;
     for (int nri = 0; nri < n_rep; nri++) {
-        LOG_INF("Benchmark prompt processing (pp)\n");
+        LOG_INF("Benchmark prompt processing (pp)");
 
         common_batch_clear(this->m_llmBatch);
 
@@ -421,13 +443,13 @@ std::string LLM::LLMImpl::BenchModel(int& prompts, int& eval_prompts, int& n_max
 
         const auto t_prompts_start = ggml_time_us();
         if (llama_decode(this->m_llmContext, this->m_llmBatch) != 0) {
-            LOG_INF("llama_decode() failed during prompt processing\n");
+            LOG_INF("llama_decode() failed during prompt processing");
         }
         const auto t_prompts_end = ggml_time_us();
 
         // bench text generation
 
-        LOG_INF("Benchmark text generation (tg)\n");
+        LOG_INF("Benchmark text generation (tg)");
 
         llama_memory_clear(llama_get_memory(this->m_llmContext), true);
         const auto t_eval_prompts_start = ggml_time_us();
@@ -437,9 +459,10 @@ std::string LLM::LLMImpl::BenchModel(int& prompts, int& eval_prompts, int& n_max
                 common_batch_add(this->m_llmBatch, 0, i, {j}, true);
             }
 
-            LOG_INF("llama_decode() text generation: %d\n", i);
+            LOG_INF("llama_decode() text generation: %d", i);
             if (llama_decode(this->m_llmContext, this->m_llmBatch) != 0) {
-                LOG_INF("llama_decode() failed during text generation \n");
+
+                THROW_ERROR("llama_decode() failed during text generation ");
             }
         }
 
@@ -459,7 +482,7 @@ std::string LLM::LLMImpl::BenchModel(int& prompts, int& eval_prompts, int& n_max
         prompts_std += speed_prompts * speed_prompts;
         eval_prompts_std += speed_eval_prompts * speed_eval_prompts;
 
-        LOG_INF("prompt eval %f t/s, token generation %f t/s\n", speed_prompts, speed_eval_prompts);
+        LOG_INF("prompt eval %f t/s, token generation %f t/s", speed_prompts, speed_eval_prompts);
     }
 
     prompts_avg /= static_cast<double>(n_rep);

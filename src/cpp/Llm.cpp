@@ -3,10 +3,12 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 //
+
 #include "LlmImpl.hpp"
 #include "LlmFactory.hpp"
 #include <stdexcept>
 #include <algorithm>
+#include "Logger.hpp"
 
 LLM::LLM(const LlmConfig &llmConfig) {
     LLMFactory factory;
@@ -72,20 +74,20 @@ void LLM::ResetContext()
 
 void LLM::Encode(EncodePayload& payload) {
     if (!m_impl) {
-        throw std::runtime_error("LLM not initialized");
+        THROW_ERROR("LLM not initialized");
     }
     const std::vector<std::string> &inptMods = m_impl->SupportedInputModalities();
 
     if(payload.textPrompt != "") {
         bool supportsText = SupportsModality(inptMods, "text");
         if(!supportsText) {
-            throw std::runtime_error("Error. Attempting to Encode an unsupported Text payload");
+            THROW_ERROR("Error. Attempting to Encode an unsupported Text payload");
         }
     }
     if(payload.imagePath != "") {
         bool supportsVision = SupportsModality(inptMods, "image");
         if(!supportsVision) {
-            throw std::runtime_error("Error. Attempting to Encode an unsupported Image payload");
+            THROW_ERROR("Error. Attempting to Encode an unsupported Image payload");
         }
     }
     std::string query = this->m_impl->QueryBuilder(payload);

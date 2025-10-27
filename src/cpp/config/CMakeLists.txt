@@ -16,7 +16,7 @@ target_include_directories(arm-llm-config PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR})
 
 include(find_json)
-target_link_libraries(arm-llm-config PUBLIC nlohmann_json::nlohmann_json)
+target_link_libraries(arm-llm-config PUBLIC nlohmann_json::nlohmann_json arm-llm-log)
 
 include(find_is_utf8)
 target_link_libraries(arm-llm-config PUBLIC is_utf8::is_utf8)

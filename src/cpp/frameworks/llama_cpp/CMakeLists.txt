@@ -82,6 +82,8 @@ if (NOT TARGET arm-llm-config)
     message(FATAL_ERROR "arm-llm-config target not defined")
 elseif (NOT TARGET arm-llm-interface)
     message(FATAL_ERROR "arm-llm-interface target not defined")
+elseif (NOT TARGET arm-llm-log)
+    message(FATAL_ERROR "arm-llm-log target not defined")
 endif()
 
 add_library(arm-llm-framework STATIC
@@ -96,4 +98,5 @@ target_link_libraries(arm-llm-framework PUBLIC
     llama
     common
     arm-llm-config
-    arm-llm-interface)
+    arm-llm-interface
+    arm-llm-log )

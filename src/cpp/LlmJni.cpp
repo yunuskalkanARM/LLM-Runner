@@ -5,8 +5,10 @@
 //
 #include "LlmConfig.hpp"
 #include "LlmImpl.hpp"
+#include "Logger.hpp"
 #include <iostream>
 #include <jni.h>
+
 
 static std::unique_ptr<LLM> llm;
 
@@ -21,24 +23,24 @@ JNIEXPORT void JNICALL Java_com_arm_Llm_llmInit(JNIEnv* env,
 {
 
     if (modelJsonStr == nullptr) {
-        std::cerr << "modelJsonStr is null" << std::endl;
+        THROW_ERROR("modelJsonStr is null");
     }
 
     const char* modelCStr = env->GetStringUTFChars(modelJsonStr, nullptr);
     if (modelCStr == nullptr) {
-        std::cerr << "GetStringUTFChars returned null" << std::endl;
+        THROW_ERROR("GetStringUTFChars returned null");
     }
 
     std::string jsonStr(modelCStr);
     env->ReleaseStringUTFChars(modelJsonStr, modelCStr);
 
     if (sharedLibraryPath == nullptr) {
-        std::cerr << "sharedLibraryPath is null" << std::endl;
+        LOG_ERROR("sharedLibraryPath is null");
     }
 
     auto sharedLibraryPathNative = env->GetStringUTFChars(sharedLibraryPath, nullptr);
     if (sharedLibraryPathNative == nullptr) {
-        std::cerr << "GetStringUTFChars returned null" << std::endl;
+        LOG_ERROR("GetStringUTFChars returned null");
     }
 
     try {
@@ -46,7 +48,7 @@ JNIEXPORT void JNICALL Java_com_arm_Llm_llmInit(JNIEnv* env,
         llm = std::make_unique<LLM>(config);
         llm->LlmInit(config, sharedLibraryPathNative);
     } catch (const std::exception& e) {
-        std::cerr << "Failed to create Llm from config string: " << e.what() << std::endl;
+        THROW_ERROR("Failed to create Llm from config string: %s", e.what());
     }
 }
 
