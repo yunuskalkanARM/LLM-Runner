@@ -11,7 +11,7 @@ if (NOT CMAKE_CROSSCOMPILING)
 endif()
 
 # BUILD_DEBUG defaults to OFF unless provided by CLI/presets.
-if(NOT DEFINED BUILD_DEBUG)
+if(NOT DEFINED BUILD_DEBUG OR NOT BUILD_DEBUG)
   set(BUILD_DEBUG OFF CACHE BOOL "Enable debug logging defaults")
   set (CMAKE_BUILD_TYPE "Release")
 else()
@@ -25,6 +25,7 @@ message(STATUS "BUILD_DEBUG = ${BUILD_DEBUG}")
 message(STATUS "BUILD_BENCHMARK = ${BUILD_BENCHMARK}")
 message(STATUS "BUILD_TESTING = ${BUILD_TESTING}")
 message(STATUS "BUILD_JNI_LIB = ${BUILD_JNI_LIB}")
+message(STATUS "CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
 
 # Only set (Global) LOG_LEVEL if not provided by user (CLI/presets)
 if(NOT DEFINED LOG_LEVEL OR LOG_LEVEL STREQUAL "")

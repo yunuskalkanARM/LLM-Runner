@@ -39,8 +39,8 @@ This repo is designed for building an
 [Arm® KleidiAI™](https://www.arm.com/markets/artificial-intelligence/software/kleidi)
 enabled LLM library using CMake build system. It intends to provide an abstraction for different Machine Learning
 frameworks/backends that Arm® KleidiAI™ kernels have been integrated into.
-Currently, it supports [llama.cpp](https://github.com/ggml-org/llama.cpp) , [mediapipe](https://github.com/google-ai-edge/mediapipe) and
-[onnxruntime-genai](https://github.com/microsoft/onnxruntime-genai) backends .
+Currently, it supports [llama.cpp](https://github.com/ggml-org/llama.cpp), [mediapipe](https://github.com/google-ai-edge/mediapipe),
+[onnxruntime-genai](https://github.com/microsoft/onnxruntime-genai), and [MNN](https://github.com/alibaba/MNN) backends.
 The backend library (selected at CMake configuration stage) is wrapped by this project's thin C++ layer that could be used
 directly for testing and evaluations. However, JNI bindings are also provided for developers targeting Android™ based
 applications.
@@ -256,6 +256,10 @@ For customising MNN framework , following parameters can be used:
 - `MNN_GIT_TAG`: Git SHA for checkout
 
 > **NOTE**: This repository has been tested with `MNN` version `v3.3.0`.
+
+> **KleidiAI™ NOTE**: :
+Although MNN can be built with USE_KLEIDIAI defined, the current MNN implementation does not fully enable KleidiAI™ optimizations at runtime.
+This limitation is due to the current MNN runtime initialization logic and will be resolved once full support is implemented upstream in MNN.
 
 
 ### Supported Models
