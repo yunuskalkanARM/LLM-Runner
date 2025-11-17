@@ -49,8 +49,8 @@ TEST_CASE("Configuration paramaters test")
     SECTION("Set parameter") {
         LlmConfig config(validConfig);
         int newNumThreads = 8;
-        config.SetConfigInt("numThreads",newNumThreads);
-        CHECK(newNumThreads == config.GetConfigInt("numThreads"));
+        config.SetConfigInt(LlmConfig::ConfigParam::NumThreads, newNumThreads);
+        CHECK(newNumThreads == config.GetConfigInt(LlmConfig::ConfigParam::NumThreads));
     }
 
     SECTION("Bad chat parameters") {

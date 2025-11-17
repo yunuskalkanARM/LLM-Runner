@@ -22,7 +22,7 @@ LLM::LLMImpl::~LLMImpl()
 void LLM::LLMImpl::LoadModel()
 {
     const llama_model_params model_params = llama_model_default_params();
-    const std::string& modelPath = this->m_config.GetConfigString("llmModelName");
+    const std::string& modelPath = this->m_config.GetConfigString(LlmConfig::ConfigParam::LlmModelName);
     if (modelPath.empty()) {
         THROW_ERROR("Model path supplied in config is empty");
     }
@@ -44,8 +44,8 @@ void LLM::LLMImpl::NewContext()
 {
     llama_context_params ctx_params = llama_context_default_params();
     ctx_params.n_ctx                = this->m_nCtx;
-    ctx_params.n_threads            = this->m_config.GetConfigInt("numThreads");
-    ctx_params.n_threads_batch      = this->m_config.GetConfigInt("numThreads");
+    ctx_params.n_threads            = this->m_config.GetConfigInt(LlmConfig::ConfigParam::NumThreads);
+    ctx_params.n_threads_batch      = this->m_config.GetConfigInt(LlmConfig::ConfigParam::NumThreads);
     ctx_params.no_perf              = false;
     this->m_llmContext              = llama_init_from_model(this->m_llmModel, ctx_params);
     if (this->m_llmContext == nullptr) {
@@ -91,8 +91,8 @@ void LLM::LLMImpl::LlmInit(const LlmConfig& config, std::string sharedLibraryPat
     try {
         llama_log_set(llama_llm_log_callback, nullptr);
         this->m_config = config;
-        this->m_batchSz = this->m_config.GetConfigInt("batchSize");
-        this->m_nCtx    = this->m_config.GetConfigInt("contextSize");
+        this->m_batchSz = this->m_config.GetConfigInt(LlmConfig::ConfigParam::BatchSize);
+        this->m_nCtx    = this->m_config.GetConfigInt(LlmConfig::ConfigParam::ContextSize);
 
         LoadModel();
         BackendInit();

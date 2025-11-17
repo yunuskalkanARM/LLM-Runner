@@ -3,7 +3,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 //
-#pragma once
+#ifndef LLM_CHAT_HPP
+#define LLM_CHAT_HPP
 
 #include <string>
 #include <nlohmann/json.hpp>
@@ -108,3 +109,5 @@ protected:
      */
     virtual bool ApplyAutoChatTemplate(Payload& payload) { return false; }
 };
+
+#endif /* LLM_CHAT_HPP */

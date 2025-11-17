@@ -3,7 +3,9 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 //
-#pragma once
+#ifndef LLM_FACTORY_HPP
+#define LLM_FACTORY_HPP
+
 #include "LlmImpl.hpp"
 
 /**
@@ -21,4 +23,4 @@ public:
      std::unique_ptr<LLM::LLMImpl> CreateLLMImpl(const LlmConfig& config);
 };
 
-
+#endif /* LLM_FACTORY_HPP */

@@ -63,7 +63,7 @@ void LLM::LLMImpl::LoadEngine(const std::string& model_path, const std::string& 
         .model_path     = model_path.c_str(),
         .cache_dir      = cache_dir.c_str(),
         .max_num_tokens = this->m_nCtx,
-        .num_threads   = static_cast<size_t>(this->m_config.GetConfigInt("numThreads"))
+        .num_threads   = static_cast<size_t>(this->m_config.GetConfigInt(LlmConfig::ConfigParam::NumThreads))
     };
 
     this->m_errorCode =
@@ -94,9 +94,9 @@ void LLM::LLMImpl::LlmInit(const LlmConfig& config, std::string sharedLibraryPat
 {
     try {
         this->m_config = config;
-        const std::string modelPath = this->m_config.GetConfigString("llmModelName");
+        const std::string modelPath = this->m_config.GetConfigString(LlmConfig::ConfigParam::LlmModelName);
         const std::string cache_dir = GetCacheDir();
-        this->m_nCtx = this->m_config.GetConfigInt("contextSize");
+        this->m_nCtx = this->m_config.GetConfigInt(LlmConfig::ConfigParam::ContextSize);
 
         std::filesystem::create_directories(cache_dir);
         LoadEngine(modelPath, cache_dir);

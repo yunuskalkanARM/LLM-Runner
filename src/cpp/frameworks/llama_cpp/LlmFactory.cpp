@@ -7,7 +7,7 @@
 #include "LlmFactory.hpp"
 
 std::unique_ptr<LLM::LLMImpl> LLMFactory::CreateLLMImpl(const LlmConfig &config) {
-    if (config.GetConfigBool("isVision")) {
+    if (config.GetConfigBool(LlmConfig::ConfigParam::IsVision)) {
         return std::make_unique<LlamaVisionImpl>();
     } else {
         return std::make_unique<LLM::LLMImpl>();

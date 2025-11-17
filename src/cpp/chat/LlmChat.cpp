@@ -16,25 +16,41 @@ void LlmChat::Print() const {
 }
 
 
-static std::string vformat(const char* format, va_list args)
+static std::string Vformat(const char* format, va_list args)
 {
+    if (!format) {
+        LOG_ERROR("Vformat: null format string");
+        return "";
+    }
     va_list tmp;
     va_copy(tmp, args);
     int num_chars = std::vsnprintf(nullptr, 0, format, tmp);
     va_end(tmp);
 
-    if (num_chars <= 0) return "";
+    if (num_chars < 0) {
+        LOG_ERROR("Vformat: vsnprintf failed during size calculation for format string \"%s\"", format);
+        return "";
+    }
 
-    std::vector<char> buf(num_chars + 1);
-    std::vsnprintf(buf.data(), buf.size(), format, args);
-    return std::string(buf.data(), num_chars);
+    if (num_chars == 0) {
+        LOG_INF("Vformat: formatted output is empty for format string \"%s\"", format);
+        return "";
+    }
+
+    std::vector<char> buf(static_cast<size_t>(num_chars) + 1);
+    int written = std::vsnprintf(buf.data(), buf.size(), format, args);
+    if (written < 0) {
+        LOG_ERROR("Vformat: vsnprintf failed during formatting for format string \"%s\"", format);
+    }
+
+    return std::string(buf.data(), static_cast<size_t>(written));
 }
 
-static std::string formatString(const char* format, ...)
+static std::string FormatString(const char* format, ...)
 {
     va_list args;
     va_start(args, format);
-    std::string result = vformat(format, args);
+    std::string result = Vformat(format, args);
     va_end(args);
     return result;
 }
@@ -47,9 +63,9 @@ void LlmChat::ApplyDefaultChatTemplate(Payload& payload)
     // Build user turn (fallback: raw user prompt)
     std::string userTurn;
     if (hasUserPlaceholder) {
-        userTurn = formatString(m_userTemplate.c_str(), payload.textPrompt.c_str());
+        userTurn = FormatString(m_userTemplate.c_str(), payload.textPrompt.c_str());
     } else {
-        LOG_INF("[Warning] userTemplate is missing '%s'; using raw text.");
+        LOG_INF("[Warning] userTemplate is missing \"%s\"; using raw text.", m_templatePlaceholder);
         userTurn = payload.textPrompt;
     }
 
@@ -62,9 +78,9 @@ void LlmChat::ApplyDefaultChatTemplate(Payload& payload)
     // Build system turn (fallback: raw system prompt)
     std::string systemTurn;
     if (hasSystemPlaceholder) {
-        systemTurn = formatString(m_systemTemplate.c_str(), m_systemPrompt.c_str());
+        systemTurn = FormatString(m_systemTemplate.c_str(), m_systemPrompt.c_str());
     } else {
-        LOG_INF("[Warning] systemTemplate is missing '%s'; prepending raw system prompt.");
+        LOG_INF("[Warning] systemTemplate is missing \"%s\"; prepending raw system prompt.", m_templatePlaceholder);
         systemTurn = m_systemPrompt;
     }
 

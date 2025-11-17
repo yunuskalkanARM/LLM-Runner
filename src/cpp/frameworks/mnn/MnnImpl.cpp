@@ -15,9 +15,9 @@ LLM::LLMImpl::~LLMImpl() {
 
 void LLM::LLMImpl::LlmInit(const LlmConfig& config, std::string sharedLibraryPath = "") {
     this->m_config            = config;
-    this->m_numOfThreads      = config.GetConfigInt("numThreads");
-    this->m_nCtx              = config.GetConfigInt("contextSize");
-    this->m_modelPath         = config.GetConfigString("llmModelName").c_str();
+    this->m_numOfThreads      = config.GetConfigInt(LlmConfig::ConfigParam::NumThreads);
+    this->m_nCtx              = config.GetConfigInt(LlmConfig::ConfigParam::ContextSize);
+    this->m_modelPath         = config.GetConfigString(LlmConfig::ConfigParam::LlmModelName).c_str();
 
     if(this->m_modelPath.empty()) {
         THROW_ERROR("LLM initialization failed: model path is empty.");

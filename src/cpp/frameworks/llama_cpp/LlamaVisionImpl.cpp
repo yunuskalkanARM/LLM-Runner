@@ -51,23 +51,23 @@ void LlamaVisionImpl::FreeLlm() {
 }
 
 void LlamaVisionImpl::LlmInit(const LlmConfig& config, std::string sharedLibraryPath) {
-
-    ggml_backend_load_all_from_path(sharedLibraryPath.c_str());
-    if (config.GetConfigInt("numThreads") <= 0) {
+    if (config.GetConfigInt(LlmConfig::ConfigParam::NumThreads) <= 0) {
         THROW_INVALID_ARGUMENT("NumThreads must be > 0");
     }
-    if (config.GetConfigInt("batchSize") <= 0) {
+    if (config.GetConfigInt(LlmConfig::ConfigParam::BatchSize) <= 0) {
         THROW_INVALID_ARGUMENT("BatchSize must be > 0");
     }
-    if (config.GetConfigInt("contextSize") <= 0) {
+    if (config.GetConfigInt(LlmConfig::ConfigParam::ContextSize) <= 0) {
         THROW_INVALID_ARGUMENT("contextSize must be > 0");
     }
+
+    ggml_backend_load_all_from_path(sharedLibraryPath.c_str());
 
     try {
         llama_log_set(llama_llm_log_callback, nullptr);
         this->m_config = config;
-        this->m_batchSz = this->m_config.GetConfigInt("batchSize");
-        this->m_nCtx    = this->m_config.GetConfigInt("contextSize");
+        this->m_batchSz = this->m_config.GetConfigInt(LlmConfig::ConfigParam::BatchSize);
+        this->m_nCtx    = this->m_config.GetConfigInt(LlmConfig::ConfigParam::ContextSize);
 
         LoadModel();
         NewContext();
@@ -92,8 +92,8 @@ void LlamaVisionImpl::ResetVisionContext() {
 
 void LlamaVisionImpl::LoadModel()
 {
-    const auto& mmproj = this->m_config.GetConfigString("projModelName");
-    const auto& model  = this->m_config.GetConfigString("llmModelName");
+    const auto& mmproj = this->m_config.GetConfigString(LlmConfig::ConfigParam::ProjModelName);
+    const auto& model  = this->m_config.GetConfigString(LlmConfig::ConfigParam::LlmModelName);
 
     if (mmproj.empty() || model.empty()) {
         THROW_INVALID_ARGUMENT("LoadModel error: modelPath or mmprojPath is empty");
@@ -212,8 +212,8 @@ void LlamaVisionImpl::NewContext() {
     }
 
     auto params = this->m_commonParams;
-    params.cpuparams.n_threads       = this->m_config.GetConfigInt("numThreads");
-    params.cpuparams_batch.n_threads = this->m_config.GetConfigInt("numThreads");
+    params.cpuparams.n_threads       = this->m_config.GetConfigInt(LlmConfig::ConfigParam::NumThreads);
+    params.cpuparams_batch.n_threads = this->m_config.GetConfigInt(LlmConfig::ConfigParam::NumThreads);
     params.n_batch                   = this->m_batchSz;
     params.n_ctx                     = this->m_nCtx;
 

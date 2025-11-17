@@ -84,13 +84,35 @@ public:
      */
     LlmConfig() =default;
 
+    /**
+     * @enum ConfigParam
+     * @brief Lists configuration keys for the LLM module.
+     */
+    enum ConfigParam {
+        // String parameters
+        SystemPrompt = 0,             ///< Base system prompt for all chats
+        SystemTemplate = 1,           ///< Template for system messages
+        UserTemplate = 2,             ///< Template for user messages
+        LlmModelName = 3,             ///< Name or path of the LLM model
+        ProjModelName = 4,            ///< Name or path of the projection (adapter) model
+
+        // Boolean parameters
+        ApplyDefaultChatTemplate = 5, ///< Whether to use the default chat formatting
+        IsVision = 6,                 ///< True if model supports vision input
+
+        // Integer parameters
+        NumThreads = 7,               ///< Number of CPU threads used for inference
+        BatchSize = 8,                ///< Number of tokens per batch
+        ContextSize = 9,              ///< Context window (max token limit)
+    };
+
      /**
      * @brief Updates a string parameter by key name.
      * @param key   Name of the configuration parameter.
      * @param value New string value to assign.
      * @throws std::invalid_argument if the key is unknown or type mismatched.
      */
-    void SetConfigString(const std::string& key, const std::string& value);
+    void SetConfigString(ConfigParam key, const std::string& value);
 
     /**
      * @brief Updates a boolean parameter by key name.
@@ -98,7 +120,7 @@ public:
      * @param value Boolean value to assign.
      * @throws std::invalid_argument if the key is unknown or type mismatched.
      */
-    void SetConfigBool(const std::string& key, bool value);
+    void SetConfigBool(ConfigParam key, bool value);
 
     /**
      * @brief Updates an integer parameter by key name.
@@ -106,7 +128,7 @@ public:
      * @param value Integer value to assign.
      * @throws std::invalid_argument if the key is unknown or type mismatched.
      */
-    void SetConfigInt(const std::string& key, int value);
+    void SetConfigInt(ConfigParam key, int value);
 
     /**
      * @brief Retrieves a string parameter by key name.
@@ -114,7 +136,7 @@ public:
      * @return String value corresponding to the key (empty string if optional and unset).
      * @throws std::invalid_argument if the key is unknown or not a string.
      */
-    std::string GetConfigString(const std::string& key) const;
+    std::string GetConfigString(ConfigParam key) const;
 
     /**
      * @brief Retrieves a boolean parameter by key name.
@@ -122,7 +144,7 @@ public:
      * @return Boolean value corresponding to the key.
      * @throws std::invalid_argument if the key is unknown or not a boolean.
      */
-    bool GetConfigBool(const std::string& key) const;
+    bool GetConfigBool(ConfigParam key) const;
 
     /**
      * @brief Retrieves an integer parameter by key name.
@@ -130,7 +152,7 @@ public:
      * @return Integer value corresponding to the key.
      * @throws std::invalid_argument if the key is unknown or not an integer.
      */
-    int GetConfigInt(const std::string& key) const;
+    int GetConfigInt(ConfigParam key) const;
 
     /**
      * @brief Accessor for chat configuration parameters.

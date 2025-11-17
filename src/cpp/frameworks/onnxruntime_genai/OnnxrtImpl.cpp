@@ -179,10 +179,10 @@ void LLM::LLMImpl::LlmInit(const LlmConfig& config, std::string sharedLibraryPat
 {
     try {
         this->m_config            = config;
-        this->m_numOfThreads      = config.GetConfigInt("numThreads");
-        this->m_modelPath         = config.GetConfigString("llmModelName");
-        this->m_batchSz           = config.GetConfigInt("batchSize");
-        this->m_nCtx              = config.GetConfigInt("contextSize");
+        this->m_numOfThreads      = config.GetConfigInt(LlmConfig::ConfigParam::NumThreads);
+        this->m_modelPath         = config.GetConfigString(LlmConfig::ConfigParam::LlmModelName);
+        this->m_batchSz           = config.GetConfigInt(LlmConfig::ConfigParam::BatchSize);
+        this->m_nCtx              = config.GetConfigInt(LlmConfig::ConfigParam::ContextSize);
 
         InitConfigs();
 

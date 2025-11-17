@@ -10,6 +10,22 @@
 
 using nlohmann::json;
 
+static inline const char* to_string(LlmConfig::ConfigParam key) {
+  switch (key) {
+    case LlmConfig::ConfigParam::SystemPrompt:            return "SystemPrompt";
+    case LlmConfig::ConfigParam::SystemTemplate:          return "SystemTemplate";
+    case LlmConfig::ConfigParam::UserTemplate:            return "UserTemplate";
+    case LlmConfig::ConfigParam::LlmModelName:            return "LlmModelName";
+    case LlmConfig::ConfigParam::ProjModelName:           return "ProjModelName";
+    case LlmConfig::ConfigParam::ApplyDefaultChatTemplate:return "ApplyDefaultChatTemplate";
+    case LlmConfig::ConfigParam::IsVision:                return "IsVision";
+    case LlmConfig::ConfigParam::NumThreads:              return "NumThreads";
+    case LlmConfig::ConfigParam::BatchSize:               return "BatchSize";
+    case LlmConfig::ConfigParam::ContextSize:             return "ContextSize";
+  }
+  return "Unknown";
+}
+
 LlmConfig::LlmConfig(const std::string& jsonStr)
 {
     json cfg;
@@ -60,48 +76,72 @@ LlmConfig::LlmConfig(const std::string& jsonStr)
     m_stopWords = std::move(stopWords);
 }
 
-void LlmConfig::SetConfigString(const std::string& key, const std::string& value) {
-    if (key == "systemPrompt")   { m_chat.systemPrompt = value; return; }
-    if (key == "systemTemplate") { m_chat.systemTemplate = value; return; }
-    if (key == "userTemplate")   { m_chat.userTemplate = value; return; }
-    if (key == "llmModelName")   { m_model.llmModelName = value; return; }
-    if (key == "projModelName")  { m_model.projModelName = value; return; }
-    THROW_INVALID_ARGUMENT("Unknown string key: %s", key.c_str());
+void LlmConfig::SetConfigString(ConfigParam key, const std::string& value) {
+    switch (key) {
+        case ConfigParam::SystemPrompt:     m_chat.systemPrompt   = value; return;
+        case ConfigParam::SystemTemplate:   m_chat.systemTemplate = value; return;
+        case ConfigParam::UserTemplate:     m_chat.userTemplate   = value; return;
+        case ConfigParam::LlmModelName:     m_model.llmModelName  = value; return;
+        case ConfigParam::ProjModelName:    m_model.projModelName = value; return;
+        default: THROW_INVALID_ARGUMENT("Unknown string key: %s", to_string(key));
+    }
 }
 
-void LlmConfig::SetConfigBool(const std::string& key, bool value) {
-    if (key == "applyDefaultChatTemplate") { m_chat.applyDefaultChatTemplate = value; return; }
-    if (key == "isVision")                 { m_model.isVision = value; return; }
-    THROW_INVALID_ARGUMENT("Unknown bool key: %s", key.c_str());
+void LlmConfig::SetConfigBool(ConfigParam key, bool value) {
+    switch (key) {
+        case ConfigParam::ApplyDefaultChatTemplate: m_chat.applyDefaultChatTemplate = value; return;
+        case ConfigParam::IsVision:                 m_model.isVision                = value; return;
+        THROW_INVALID_ARGUMENT("Unknown bool key: %s", to_string(key));
+    }
 }
 
-void LlmConfig::SetConfigInt(const std::string& key, int value) {
-    if (key == "numThreads") { m_runtime.numThreads = value; return; }
-    if (key == "batchSize")  { m_runtime.batchSize  = value; return; }
-    if (key == "contextSize"){ m_runtime.contextSize= value; return; }
-    THROW_INVALID_ARGUMENT("Unknown int key: %s", key.c_str());
+void LlmConfig::SetConfigInt(ConfigParam key, int value) {
+    switch (key) {
+        case ConfigParam::NumThreads:
+            if (value <= 0) {
+                THROW_INVALID_ARGUMENT("NumThreads must be > 0");
+            }
+            m_runtime.numThreads = value; return;
+        case ConfigParam::BatchSize:
+            if (value <= 0) {
+                THROW_INVALID_ARGUMENT("BatchSize must be > 0");
+            }
+            m_runtime.batchSize = value; return;
+        case ConfigParam::ContextSize:
+            if (value <= 0) {
+                THROW_INVALID_ARGUMENT("ContextSize must be > 0");
+            }
+            m_runtime.contextSize = value; return;
+        default: THROW_INVALID_ARGUMENT("Unknown int key: %s", to_string(key));
+    }
 }
 
-std::string LlmConfig::GetConfigString(const std::string& key) const {
-    if (key == "systemPrompt")   return m_chat.systemPrompt;
-    if (key == "systemTemplate") return m_chat.systemTemplate;
-    if (key == "userTemplate")   return m_chat.userTemplate;
-    if (key == "llmModelName")   return m_model.llmModelName;
-    if (key == "projModelName")  return m_model.projModelName;
-    THROW_INVALID_ARGUMENT("Unknown string key: %s", key.c_str());
+[[nodiscard]] std::string LlmConfig::GetConfigString(ConfigParam key) const {
+    switch (key) {
+        case ConfigParam::SystemPrompt:     return m_chat.systemPrompt;
+        case ConfigParam::SystemTemplate:   return m_chat.systemTemplate;
+        case ConfigParam::UserTemplate:     return m_chat.userTemplate;
+        case ConfigParam::LlmModelName:     return m_model.llmModelName;
+        case ConfigParam::ProjModelName:    return m_model.projModelName;
+        default: THROW_INVALID_ARGUMENT("Unknown string key: %s", to_string(key));
+    }
 }
 
-bool LlmConfig::GetConfigBool(const std::string& key) const {
-    if (key == "applyDefaultChatTemplate") return m_chat.applyDefaultChatTemplate;
-    if (key == "isVision")                 return m_model.isVision;
-    THROW_INVALID_ARGUMENT("Unknown bool key: %s", key.c_str());
+[[nodiscard]] bool LlmConfig::GetConfigBool(ConfigParam key) const {
+    switch (key) {
+        case ConfigParam::ApplyDefaultChatTemplate: return m_chat.applyDefaultChatTemplate;
+        case ConfigParam::IsVision:                 return m_model.isVision;
+        default: THROW_INVALID_ARGUMENT("Unknown bool key: %s", to_string(key));
+    }
 }
 
-int LlmConfig::GetConfigInt(const std::string& key) const {
-    if (key == "numThreads") return m_runtime.numThreads;
-    if (key == "batchSize")  return m_runtime.batchSize;
-    if (key == "contextSize")return m_runtime.contextSize;
-    THROW_INVALID_ARGUMENT("Unknown int key: %s", key.c_str());
+[[nodiscard]] int LlmConfig::GetConfigInt(ConfigParam key) const {
+    switch (key) {
+        case ConfigParam::NumThreads:  return m_runtime.numThreads;
+        case ConfigParam::BatchSize:   return m_runtime.batchSize;
+        case ConfigParam::ContextSize: return m_runtime.contextSize;
+        default: THROW_INVALID_ARGUMENT("Unknown int key: %s", to_string(key));
+    }
 }
 
 void LlmConfig::SetStopWords(const std::vector<std::string>& stopWords)

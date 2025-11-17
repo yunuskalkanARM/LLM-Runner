@@ -82,13 +82,13 @@ LlmConfig SetupTestConfig()
     std::string jsonContent = buffer.str();
 
     LlmConfig configTest{jsonContent};
-    std::string modelPath = s_modelRootDir + "/" + configTest.GetConfigString("llmModelName");
-    configTest.SetConfigString("llmModelName", modelPath);
+    std::string modelPath = s_modelRootDir + "/" + configTest.GetConfigString(LlmConfig::ConfigParam::LlmModelName);
+    configTest.SetConfigString(LlmConfig::ConfigParam::LlmModelName, modelPath);
 
     // llama.cpp multimodal only
-    if (!configTest.GetConfigString("projModelName").empty()) {
-        std::string projModelPath = s_modelRootDir + "/" + configTest.GetConfigString("projModelName");
-        configTest.SetConfigString("projModelName", projModelPath);
+    if (!configTest.GetConfigString(LlmConfig::ConfigParam::ProjModelName).empty()) {
+        std::string projModelPath = s_modelRootDir + "/" + configTest.GetConfigString(LlmConfig::ConfigParam::ProjModelName);
+        configTest.SetConfigString(LlmConfig::ConfigParam::ProjModelName, projModelPath);
     }
     return configTest;
 }
@@ -101,7 +101,7 @@ TEST_CASE("LLM Factory test") {
     LLM llm{};
     llm.LlmInit(configTest);
     std::vector<std::string> modalities = llm.SupportedInputModalities();
-    if(configTest.GetConfigBool("isVision")) {
+    if(configTest.GetConfigBool(LlmConfig::ConfigParam::IsVision)) {
         CHECK(modalities.size() == 2);
     } else {
         CHECK(modalities.size() == 1);
@@ -124,7 +124,7 @@ TEST_CASE("Test Llm-Wrapper class")
     int circuitBreaker = 0;
     
     // Multimodal tests only
-    if (configTest.GetConfigBool("isVision"))
+    if (configTest.GetConfigBool(LlmConfig::ConfigParam::IsVision))
     {
          // Validate the vision path can describe objects in images.
         SECTION("Describe Image")
@@ -288,7 +288,7 @@ TEST_CASE("Test Llm-Wrapper class")
     SECTION("Test Load Empty Model")
     {
         std::string emptyString;
-        configTest.SetConfigString("llmModelName", emptyString);
+        configTest.SetConfigString(LlmConfig::ConfigParam::LlmModelName, emptyString);
         REQUIRE_THROWS(llm.LlmInit(configTest, s_backendSharedLibraryDir));
         llm.FreeLlm();
     }

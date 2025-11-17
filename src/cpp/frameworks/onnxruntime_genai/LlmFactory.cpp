@@ -8,8 +8,8 @@
 #include "Logger.hpp"
 
 std::unique_ptr<LLM::LLMImpl> LLMFactory::CreateLLMImpl(const LlmConfig &config) {
-    if (config.GetConfigBool("isVision")) {
-        THROW_ERROR("Error, image input modality specified, but no supported by this LLMImpl");
+    if (config.GetConfigBool(LlmConfig::ConfigParam::IsVision)) {
+        THROW_ERROR("Error, image input modality specified, but not supported by this LLMImpl");
     } else {
         return std::make_unique<LLM::LLMImpl>();
     }
