@@ -272,6 +272,7 @@ void LLM::LLMImpl::Encode(LlmChat::Payload& payload)
 std::string LLM::LLMImpl::NextToken()
 {
     auto token = m_tokenQueue.dequeue();
+    this->m_conversationContext += token;
     return token;
 }
 

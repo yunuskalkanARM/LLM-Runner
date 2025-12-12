@@ -112,18 +112,16 @@ public class LlmTestJNI {
     public void testInferenceHandlesEmptyQuestion() {
         Llm llm = new Llm();
         llm.llmInit(configJson.toString(), backendSharedLibDir);
-
-        String question1 = "What is the capital of the USA?";
+        String question1 = "Paris is the capital of what country?";
         String response1 = llm.getResponse(question1);
-        checkLlmMatch(response1, "Washington", true);
-
+        checkLlmMatch(response1, "France", true);
+    
         // Send an empty prompt to simulate blank recordings or non-speech tokens being returned by speech recognition;
         // then ask follow-up questions to ensure previous context persists when an empty prompt is injected in the conversation.
         String emptyResponse = llm.getResponse("");
-
-        String question3 = "List the top 3 languages spoken in that city?";
+        String question3 = "What languages do they speak there?";
         String response3 = llm.getResponse(question3);
-        checkLlmMatch(response3, "English", true);
+        checkLlmMatch(response3, "French", true);
         llm.freeModel();
     }
 
