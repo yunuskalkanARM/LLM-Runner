@@ -25,7 +25,8 @@ set(DOWNLOADS_LOCK_TIMEOUT 600
     "Timeout in seconds for lock to hold off concurrent CMake configurations
     trying to download resources to the same directory.")
 
-option(BUILD_BENCHMARK    "Build benchmark binary" ON)
-option(BUILD_LLM_TESTING  "Build unit tests"       ON)
-option(BUILD_JNI_LIB      "Build JNI lib"          ON)
-option(LLAMA_BUILD_COMMON "Include LLAMA common"   ON)
+option(BUILD_BENCHMARK    "Build benchmark binary"            ON)
+option(BUILD_LLM_TESTING  "Build unit tests"                  ON)
+option(BUILD_JNI_LIB      "Build JNI lib"                     ON)
+option(LLAMA_BUILD_COMMON "Include LLAMA common"              ON)
+option(ENABLE_STREAMLINE  "Enable Arm Streamline annotations" OFF)

@@ -10,16 +10,31 @@
 #include <algorithm>
 #include "Logger.hpp"
 #include "LlmBridge.hpp"
+#if defined(ENABLE_STREAMLINE)
+#include "profiling/StreamlineLlm.hpp"
+#endif
 
-LLM::LLM() {}
-
-LLM::~LLM()
+LLM::LLM()
 {
+#if defined(ENABLE_STREAMLINE)
+    sl::InitThreadOnce();
+#endif
+}
+
+LLM::~LLM() noexcept
+{
+#if defined(ENABLE_STREAMLINE)
+    sl::Scope scope(sl::CH_CONTROL, ANNOTATE_DKGRAY, "LLM::~LLM");
+#endif
     this->FreeLlm();
 }
 
 void LLM::LlmInit(const LlmConfig &llmConfig, std::string sharedLibraryPath)
 {
+#if defined(ENABLE_STREAMLINE)
+    sl::marker(ANNOTATE_BLUE, "Init start");
+    sl::Scope scope(sl::CH_INIT, ANNOTATE_BLUE, "LLM::LlmInit");
+#endif
     LLMFactory factory;
     this->m_impl = factory.CreateLLMImpl(llmConfig);
     this->m_config = llmConfig;
@@ -27,39 +42,74 @@ void LLM::LlmInit(const LlmConfig &llmConfig, std::string sharedLibraryPath)
     const auto &stopWords = this->m_config.GetStopWords();
 
     this->m_impl->LlmInit(this->m_config, sharedLibraryPath);
+
+#if defined(ENABLE_STREAMLINE)
+    sl::marker(ANNOTATE_BLUE, "Init complete");
+#endif
 }
 
 void LLM::FreeLlm()
 {
+#if defined(ENABLE_STREAMLINE)
+    sl::Scope scope(sl::CH_CONTROL, ANNOTATE_DKGRAY, "LLM::FreeLlm");
+#endif
     this->m_impl->FreeLlm();
 }
 
 float LLM::GetEncodeTimings() const
 {
+#if defined(ENABLE_STREAMLINE)
+    sl::Scope scope(sl::CH_CONTROL, ANNOTATE_DKGRAY, "LLM::GetEncodeTimings");
+#endif
     return this->m_impl->GetEncodeTimings();
 }
 
 float LLM::GetDecodeTimings() const
 {
+#if defined(ENABLE_STREAMLINE)
+    sl::Scope scope(sl::CH_CONTROL, ANNOTATE_DKGRAY, "LLM::GetDecodeTimings");
+#endif
     return this->m_impl->GetDecodeTimings();
 }
 
 void LLM::ResetTimings()
 {
+#if defined(ENABLE_STREAMLINE)
+    sl::Scope scope(sl::CH_CONTROL, ANNOTATE_DKGRAY, "LLM::ResetTimings");
+#endif
     this->m_impl->ResetTimings();
 }
 
 std::string LLM::SystemInfo() const
 {
+#if defined(ENABLE_STREAMLINE)
+    sl::Scope scope(sl::CH_CONTROL, ANNOTATE_DKGRAY, "LLM::SystemInfo");
+#endif
     return this->m_impl->SystemInfo();
 }
 
 void LLM::ResetContext()
 {
+#if defined(ENABLE_STREAMLINE)
+    sl::Scope scope(sl::CH_CONTROL, ANNOTATE_DKGRAY, "LLM::ResetContext");
+#endif
     this->m_impl->ResetContext();
 }
 
 void LLM::Encode(LlmChat::Payload& payload) {
+#if defined(ENABLE_STREAMLINE)
+    sl::Scope scope(sl::CH_ENCODE, ANNOTATE_GREEN, "LLM::Encode");
+
+    // Modality markers (rare / high-signal)
+    if (!payload.textPrompt.empty() && payload.imagePath.empty()) {
+        sl::marker(ANNOTATE_GREEN, "Encode: text");
+    } else if (payload.textPrompt.empty() && !payload.imagePath.empty()) {
+        sl::marker(ANNOTATE_CYAN, "Encode: image");
+    } else if (!payload.textPrompt.empty() && !payload.imagePath.empty()) {
+        sl::marker(ANNOTATE_YELLOW, "Encode: text+image");
+    }
+#endif
+
     if (!m_impl) {
         THROW_ERROR("LLM not initialized");
     }
@@ -82,6 +132,9 @@ void LLM::Encode(LlmChat::Payload& payload) {
 }
 
 bool LLM::SupportsModality(const std::vector<std::string> &inptMods, std::string modality) const {
+#if defined(ENABLE_STREAMLINE)
+    sl::Scope scope(sl::CH_CONTROL, ANNOTATE_DKGRAY, "LLM::SupportsModality");
+#endif
     auto toLower = [](std::string s) {
         std::transform(s.begin(), s.end(), s.begin(),
                        [](unsigned char c){ return std::tolower(c); });
@@ -98,6 +151,10 @@ bool LLM::SupportsModality(const std::vector<std::string> &inptMods, std::string
 
 std::string LLM::NextToken()
 {
+#if defined(ENABLE_STREAMLINE)
+    sl::Scope scope(sl::CH_DECODE, ANNOTATE_PURPLE, "LLM::NextToken");
+#endif
+
     auto token = this->m_impl->NextToken();
 
     if (this->isStopToken(token)) {
@@ -109,6 +166,10 @@ std::string LLM::NextToken()
 
 std::string LLM::CancellableNextToken(long operationId) const
 {
+#if defined(ENABLE_STREAMLINE)
+    sl::Scope outer(sl::CH_DECODE, ANNOTATE_PURPLE, "LLM::CancellableNextToken");
+#endif
+
     auto state = std::make_shared<WorkState>();
     state->operationId = operationId;
     addWork(state);
@@ -141,13 +202,18 @@ std::string LLM::CancellableNextToken(long operationId) const
 
 void LLM::Cancel(long operationId)
 {
+#if defined(ENABLE_STREAMLINE)
+    sl::Scope scope(sl::CH_CONTROL, ANNOTATE_RED, "LLM::Cancel");
+    sl::marker(ANNOTATE_RED, "Cancel requested");
+#endif
+
     auto state = findWork(operationId);
     if (!state) {
         return;
     }
     state->cancelled.store(true, std::memory_order_release);
-    
-    
+
+
     this->m_impl->Cancel();
 }
 
@@ -179,10 +245,17 @@ bool LLM::isStopToken(std::string token)
 
 std::string LLM::GeneratePromptWithNumTokens(size_t numPromptTokens)
 {
+#if defined(ENABLE_STREAMLINE)
+    sl::Scope scope(sl::CH_ENCODE, ANNOTATE_GREEN, "LLM::GeneratePromptWithNumTokens");
+#endif
     return this->m_impl->GeneratePromptWithNumTokens(numPromptTokens);
 }
 
 void LLM::StopGeneration()
 {
+#if defined(ENABLE_STREAMLINE)
+    sl::Scope scope(sl::CH_CONTROL, ANNOTATE_RED, "LLM::StopGeneration");
+    sl::marker(ANNOTATE_RED, "StopGeneration requested");
+#endif
     this->m_impl->StopGeneration();
 }

@@ -13,6 +13,7 @@
   * [Quick start](#quick-start)
   * [Cross Compilation for Android and Aarch64](#cross-compilation-for-android-and-aarch64)
   * [To build an executable benchmark binary](#to-build-an-executable-benchmark-binary)
+  * [Supported Platforms & cmake presets](#supported-platforms--cmake-presets)
   * [Configuration options](#configuration-options)
     * [Conditional options](#conditional-options)
       * [llama cpp options](#llama-cpp-options)
@@ -162,6 +163,7 @@ Flag name | Default | Values | Description |
 |---|---|---|---|
 | LLM_FRAMEWORK | llama.cpp | llama.cpp / mediapipe / onnxruntime-genai / mnn | Specifies the backend framework to be used. |
 | BUILD_DEBUG | OFF | ON/OFF | If set to ON a debug build is configured. |
+| ENABLE_STREAMLINE | OFF | ON/OFF | Enables Arm Streamline timeline annotations for analyzing LLM initialization, encode, decode, and control-path performance. |
 | BUILD_LLM_TESTING | ON | ON/OFF | Builds the project's functional tests when ON. |
 | BUILD_BENCHMARK | OFF | ON/OFF | Builds the framework's benchmark binaries and arm-llm-bench-cli for the project when ON. |
 | BUILD_JNI_LIB| ON | ON/OFF | Builds the JNI bindings for the project. |

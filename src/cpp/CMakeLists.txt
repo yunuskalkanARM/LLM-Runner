@@ -9,6 +9,7 @@ project(arm-llm-cpp-prj
         DESCRIPTION "An LLM CPP library"
         LANGUAGES   C CXX ASM)
 
+# Add log
 add_subdirectory(log)
 
 # Add interface:
@@ -37,6 +38,12 @@ target_link_libraries(arm-llm-cpp PUBLIC
     arm-llm-framework
     arm-llm-chat
     arm-llm-log)
+
+# Enable streamline annotation
+if(ENABLE_STREAMLINE)
+    include(streamline)
+    arm_enable_streamline(arm-llm-cpp)
+endif()
 
 # If building with JNI support, build a separate
 # target to provide these bindings.
