@@ -17,6 +17,7 @@
 #include "sampling.h"
 #include "LlamaTextImpl.hpp"
 #include "Logger.hpp"
+#include "log.h"
 
 /**
  * @brief Application context for multimodal (text + vision) inference using llama.cpp and MTMD.
@@ -31,7 +32,7 @@ struct mtmd_app_context {
     mtmd::context_ptr ctx_vision{};
 
     /** Result of llama initialization (model + context handles). */
-    common_init_result llama_init{};
+    common_init_result_ptr llama_init{};
 
     /** Pointer to the loaded llama model. */
     llama_model* model = nullptr;
@@ -57,27 +58,33 @@ struct mtmd_app_context {
     /** Current past token position (used for autoregressive decoding). */
     llama_pos n_past = 0;
 
+    /** mtmd_app_context: Deleted copy constructor. */
+    mtmd_app_context() = delete;
+
     /**
      * @brief Construct a new application context from parameters.
      * @param params Common initialization parameters for llama + MTMD.
      */
     explicit mtmd_app_context(common_params& params)
             : llama_init(common_init_from_params(params)),
-              model(llama_init.model.get()),
-              lctx(llama_init.context.get()),
-              vocab(llama_model_get_vocab(model)),
-              n_threads(params.cpuparams.n_threads),
-              batch(llama_batch_init(params.n_batch, 0, 1)),
-              n_batch(params.n_batch) {
-        if (!lctx) {
-            THROW_ERROR("Error initialising multimodal app context. "
-                                                 "llama_context is null.");
-        }
-        if (!model) {
-            THROW_ERROR("Error initialising multimodal app context. "
-                                                 "llama_model is null.");
+              n_batch(params.n_batch),
+              n_threads(params.cpuparams.n_threads) {
+
+        if (!llama_init) {
+            THROW_ERROR("Error initialising multimodal app context. common_init_from_params returned null.");
         }
 
+        model = llama_init->model();
+        lctx  = llama_init->context();
+
+        if (!model) {
+            THROW_ERROR("Error initialising multimodal app context. llama_model is null.");
+        }
+        if (!lctx) {
+            THROW_ERROR("Error initialising multimodal app context. llama_context is null.");
+        }
+        vocab = llama_model_get_vocab(model);
+        batch = llama_batch_init(params.n_batch, 0, 1);
         init_vision_context(params);
     }
 
@@ -94,12 +101,11 @@ struct mtmd_app_context {
      */
     void init_vision_context(const common_params& params) {
         const std::string& clip_path = params.mmproj.path;
-
-        auto mparams       = mtmd_context_params_default();
-        mparams.use_gpu    = params.mmproj_use_gpu;
+        auto mparams = mtmd_context_params_default();
+        mparams.use_gpu = params.mmproj_use_gpu;
         mparams.print_timings = true;
-        mparams.n_threads  = params.cpuparams.n_threads;
-        //we are mapping LLM_LOG_LEVEL to GGML_LOG_LEVEL
+        mparams.n_threads = params.cpuparams.n_threads;
+        mparams.warmup = false;
         std::unordered_map<int,ggml_log_level> log_mapping{
             {0,GGML_LOG_LEVEL_ERROR},
             {1,GGML_LOG_LEVEL_WARN},
@@ -107,7 +113,7 @@ struct mtmd_app_context {
             {3,GGML_LOG_LEVEL_DEBUG},
             {4,GGML_LOG_LEVEL_NONE}
         };
-        mparams.verbosity = log_mapping[ACTIVE_LOG_LEVEL];
+        common_log_set_verbosity_thold(log_mapping[ACTIVE_LOG_LEVEL]);
         ctx_vision.reset(mtmd_init_from_file(clip_path.c_str(), model, mparams));
         if (!ctx_vision) {
             THROW_ERROR("Failed to load vision model from %s", clip_path.c_str());
@@ -217,8 +223,7 @@ public:
      */
     void QueryBuilder(LlmChat::Payload& payload) override {
         if(payload.imagePath != "") {
-            payload.textPrompt = payload.textPrompt + "#" + std::to_string(this->m_imageIndex) + this->m_mediaMarker;
-            this->m_imageIndex += 1;
+            payload.textPrompt = this->m_mediaMarker + payload.textPrompt;
         }
         LlmChat::QueryBuilder(payload);
     }
@@ -235,9 +240,6 @@ private:
 
     /** Length of prefix tokens encoded. */
     size_t m_prefixLength{0};
-
-    /** Image index in the conversation */
-    size_t m_imageIndex{0};
 
     /** Resets the vision-specific application context. */
     void ResetVisionContext();

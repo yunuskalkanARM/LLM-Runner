@@ -161,9 +161,9 @@ TEST_CASE("LLM Wrapper: End-to-end text and vision tests")
         CHECK(std::string(e.what()).find("context is full") != std::string::npos);
     };
 
-    //
-    // Multimodal tests (vision enabled)
-    //
+    /**
+     * Multimodal tests: vision enabled
+     */
     if (configTest.GetConfigBool(LlmConfig::ConfigParam::IsVision))
     {
         SECTION("Vision: Describe objects in images")
@@ -280,9 +280,9 @@ TEST_CASE("LLM Wrapper: End-to-end text and vision tests")
         }
     }
 
-    //
-    // Pure text tests
-    //
+    /**
+     * Pure text tests
+     */
     SECTION("Text: Simple query/response")
     {
         llm.LlmInit(configTest, s_backendSharedLibraryDir);

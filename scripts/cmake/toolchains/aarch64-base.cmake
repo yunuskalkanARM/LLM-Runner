@@ -1,5 +1,5 @@
 #
-# SPDX-FileCopyrightText: Copyright 2025 Arm Limited and/or its affiliates <open-source-office@arm.com>
+# SPDX-FileCopyrightText: Copyright 2025-2026 Arm Limited and/or its affiliates <open-source-office@arm.com>
 #
 # SPDX-License-Identifier: Apache-2.0
 #
@@ -17,9 +17,9 @@ if("${LLM_FRAMEWORK}" STREQUAL "llama.cpp"
     Armv8.2_4
     Armv8.2_5
     Armv8.6_1
-    Armv8.6_2
-    Armv9.2_1
-    Armv9.2_2
+    Armv9.0_1_1
+    Armv9.2_1_1
+    Armv9.2_2_1
   )
 
   if(NOT DEFINED CPU_ARCH)
@@ -46,13 +46,13 @@ if("${LLM_FRAMEWORK}" STREQUAL "llama.cpp"
   elseif(CPU_ARCH STREQUAL "Armv8.2_5")
     set(_march "armv8.2-a+dotprod+i8mm+sve+sme")
   elseif(CPU_ARCH STREQUAL "Armv8.6_1")
-    set(_march "armv8.6-a+dotprod+fp16+sve+i8mm")
-  elseif(CPU_ARCH STREQUAL "Armv8.6_2")
-    set(_march "armv8.6-a+dotprod+fp16+sve+i8mm+sve2")
-  elseif(CPU_ARCH STREQUAL "armv9.2_1")
-    set(_march "armv9.2-a+dotprod+fp16+sve+i8mm+sme")
-  elseif(CPU_ARCH STREQUAL "armv9.2_2")
-    set(_march "armv9.2-a+dotprod+fp16+sve+i8mm+sve2+sme")
+    set(_march "armv8.6-a+dotprod+fp16+i8mm")
+  elseif(CPU_ARCH STREQUAL "Armv9.0_1_1")
+    set(_march "armv8.6-a+dotprod+fp16+i8mm+nosve")
+  elseif(CPU_ARCH STREQUAL "armv9.2_1_1")
+    set(_march "armv9.2-a+dotprod+fp16+nosve+i8mm+sme")
+  elseif(CPU_ARCH STREQUAL "armv9.2_2_1")
+    set(_march "armv9.2-a+dotprod+fp16+nosve+i8mm+sme")
   else()
   list(JOIN _allowed_arches ", " _allowed_str)
     message(FATAL_ERROR

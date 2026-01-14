@@ -1,5 +1,5 @@
 #
-# SPDX-FileCopyrightText: Copyright 2025 Arm Limited and/or its affiliates <open-source-office@arm.com>
+# SPDX-FileCopyrightText: Copyright 2025-2026 Arm Limited and/or its affiliates <open-source-office@arm.com>
 #
 # SPDX-License-Identifier: Apache-2.0
 #
@@ -16,34 +16,38 @@ if (GGML_CPU_ALL_VARIANTS)
         # same location as this file.
         file(COPY ${LLAMA_SRC_DIR}/ggml/src/ggml-cpu DESTINATION ${CMAKE_CURRENT_SOURCE_DIR})
 
-        file(GLOB GGML_HEADERS "${LLAMA_SRC_DIR}/ggml/src/*.h")
-        file(COPY ${GGML_HEADERS} DESTINATION ${CMAKE_CURRENT_SOURCE_DIR})
+        file(GLOB GGML_PRIVATE_HEADERS "${LLAMA_SRC_DIR}/ggml/src/*.h")
+        file(COPY ${GGML_PRIVATE_HEADERS} DESTINATION ${CMAKE_CURRENT_SOURCE_DIR})
 
-         # Add the different variants.
-        if (NOT TARGET ggml-cpu-android_armv8.6_2)
-            ggml_add_cpu_backend_variant(android_armv8.6_2
+        file(GLOB GGML_PUBLIC_HEADERS "${LLAMA_SRC_DIR}/ggml/include/*.h")
+        file(COPY ${GGML_PRIVATE_HEADERS} DESTINATION ${CMAKE_CURRENT_SOURCE_DIR})
+        file(COPY ${GGML_PUBLIC_HEADERS} DESTINATION ${CMAKE_CURRENT_SOURCE_DIR})
+        set(GGML_SYSTEM_ARCH "ARM")
+
+        # Add the different variants.
+        if (NOT TARGET ggml-cpu-android_armv9.0_1_1)
+            ggml_add_cpu_backend_variant(android_armv9.0_1_1
                 DOTPROD
                 FP16_VECTOR_ARITHMETIC
-                SVE
-                MATMUL_INT8
-                SVE2)
+                NOSVE
+                MATMUL_INT8)
         endif()
 
-        if (NOT TARGET ggml-cpu-android_armv9.2_1)
-            ggml_add_cpu_backend_variant(android_armv9.2_1
-                    DOTPROD
-                    FP16_VECTOR_ARITHMETIC
-                    SVE
-                    MATMUL_INT8
-                    SME)
+        if (NOT TARGET ggml-cpu-android_armv9.2_1_1)
+            ggml_add_cpu_backend_variant(android_armv9.2_1_1
+                DOTPROD
+                FP16_VECTOR_ARITHMETIC
+                NOSVE
+                MATMUL_INT8
+                SME)
         endif()
-        if (NOT TARGET ggml-cpu-android_armv9.2_2)
-            ggml_add_cpu_backend_variant(android_armv9.2_2 DOTPROD
-                    FP16_VECTOR_ARITHMETIC
-                    SVE
-                    MATMUL_INT8
-                    SVE2
-                    SME)
+        if (NOT TARGET ggml-cpu-android_armv9.2_2_1)
+            ggml_add_cpu_backend_variant(android_armv9.2_2_1 
+                DOTPROD
+                FP16_VECTOR_ARITHMETIC
+                NOSVE
+                MATMUL_INT8
+                SME)
         endif()
 
         # Change target lib location for all
@@ -56,9 +60,9 @@ if (GGML_CPU_ALL_VARIANTS)
             ggml-cpu-android_armv8.2_1
             ggml-cpu-android_armv8.2_2
             ggml-cpu-android_armv8.6_1
-            ggml-cpu-android_armv8.6_2
-            ggml-cpu-android_armv9.2_1
-            ggml-cpu-android_armv9.2_2
+            ggml-cpu-android_armv9.0_1_1
+            ggml-cpu-android_armv9.2_1_1
+            ggml-cpu-android_armv9.2_2_1
             )
 
         foreach(TAR ${TARGET_LIBS_FOR_ANDROID})

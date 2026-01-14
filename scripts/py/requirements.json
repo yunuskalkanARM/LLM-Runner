@@ -23,9 +23,9 @@
         {
         "name": "qwen mmproj model",
         "purpose": "To enable basic testing",
-        "destination": "llama.cpp/qwen2vl-2b/qwen2vl-2b_Q8_0_proj.gguf",
-        "url": "https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf?download=true",
-        "sha256sum": "a0ad91f00a7a80dcf84d719a61b00ee2e07b71794f4ee2dfa81a254621a8c418"
+        "destination": "llama.cpp/qwen2vl-2b/qwen2vl-2b-F16_proj.gguf",
+        "url": "https://huggingface.co/bartowski/Qwen2-VL-2B-Instruct-GGUF/resolve/main/mmproj-Qwen2-VL-2B-Instruct-f16.gguf?download=true",
+        "sha256sum": "05cc3ae461a7b6aa4023312ccab549ecab77cf8677efee04f049fcbab55b8bc3"
         },
         {
           "name": "qwen model",

@@ -61,8 +61,6 @@ void LlamaVisionImpl::LlmInit(const LlmConfig& config, std::string sharedLibrary
     if (config.GetConfigInt(LlmConfig::ConfigParam::ContextSize) <= 0) {
         THROW_INVALID_ARGUMENT("contextSize must be > 0");
     }
-
-
     try {
         // llama_log_set should be the very beginning of llama initialization to obtain all logs.
         llama_log_set(llama_llm_log_callback, nullptr);
@@ -86,7 +84,6 @@ void LlamaVisionImpl::ResetVisionContext() {
     this->m_mtmdContext->n_past = this->m_nCur;
     this->m_contextFilled = (100 * this->m_nCur) / this->m_nCtx;
     this->m_mtmdContext->bitmaps.entries.clear();
-    this->m_imageIndex = 0;
     this->m_allocated = 0;
     common_batch_clear(this->m_mtmdContext->batch);
     llama_perf_context_reset(this->m_llmContext);
@@ -156,6 +153,10 @@ void LlamaVisionImpl::Encode(LlmChat::Payload& payload) {
             /* reset_state = */ true,
             &newPast
     );
+    // This error can be linked to ggml status to get a better context error
+    if (newPast >= this->m_nCtx) {
+        THROW_ERROR("Encode: Failed to evaluate: context is full" );
+    }
     
     if (evalFailed) {
         THROW_ERROR("Encode: Failed to evaluate multimodal prompt");
@@ -164,7 +165,6 @@ void LlamaVisionImpl::Encode(LlmChat::Payload& payload) {
     llama_synchronize(this->m_llmContext);
     this->m_mtmdContext->n_past = newPast;
     this->m_nCur                = newPast;
-
     this->m_allocated += mtmd_helper_get_n_tokens(chunks.ptr.get());
     this->m_contextFilled = std::min<size_t>((100ULL * this->m_nCur) / this->m_nCtx, 100);
 

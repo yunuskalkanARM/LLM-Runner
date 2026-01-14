@@ -1,5 +1,5 @@
 #
-# SPDX-FileCopyrightText: Copyright 2025 Arm Limited and/or its affiliates <open-source-office@arm.com>
+# SPDX-FileCopyrightText: Copyright 2025-2026 Arm Limited and/or its affiliates <open-source-office@arm.com>
 #
 # SPDX-License-Identifier: Apache-2.0
 #
@@ -48,10 +48,9 @@ set(LLAMA_GIT_URL "https://github.com/ggerganov/llama.cpp.git"
         CACHE STRING
         "Git URL for llama.cpp repo")
 
-set(LLAMA_GIT_SHA "4258e0cfe72c72ad2787be1e9f93253e89219455"
+set(LLAMA_GIT_SHA "b7870"
         CACHE STRING
         "Git commit SHA for llama.cpp repo")
-
 
 set(LLAMA_BUILD_TOOLS    ON)
 set(LLAMA_CURL           OFF CACHE BOOL "llama: use libcurl to download model from an URL")

@@ -1,5 +1,5 @@
 <!--
-    SPDX-FileCopyrightText: Copyright 2024-2025 Arm Limited and/or its affiliates <open-source-office@arm.com>
+    SPDX-FileCopyrightText: Copyright 2024-2026 Arm Limited and/or its affiliates <open-source-office@arm.com>
 
     SPDX-License-Identifier: Apache-2.0
 -->
@@ -55,7 +55,7 @@ applications.
   library can be built for any native machine.
 * CMake 3.28 or above installed
 * Python 3.9 or above installed, python is used to download test resources and models
-* Android™ NDK (if building for Android™). Minimum version: r27 is recommended and can be downloaded
+* Android™ NDK (if building for Android™). Minimum version: 29.0.14206865 is recommended and can be downloaded
   from [here](https://developer.android.com/ndk/downloads)
 * Building on macOS requires Xcode Command Line Tools, Android Studio installed and configured (NDK, CMake as above) and Clang (tested with 16.0.0)
 * Bazelisk or Bazel 7.4.1 to build mediapipe backend
@@ -185,8 +185,9 @@ The table below gives the mapping of CPU_ARCH flags to Arm CPU features
 | Armv8.2_5    | -march=armv8.2-a+dotprod+i8mm+sve+sme          |
 | Armv8.6_1    | -march=armv8.6-a+dotprod+fp16+sve+i8mm         |
 | Armv8.6_2    | -march=armv8.6-a+dotprod+fp16+sve+i8mm+sve2    |
-| armv9.2_1    | -march=armv9.2-a+dotprod+fp16+sve+i8mm+sme     |
-| armv9.2_2    | -march=armv9.2-a+dotprod+fp16+sve+i8mm+sve2+sme|
+| armv9.0_1    | -march=armv9.2-a+dotprod+fp16+nosve+i8mm+sme   |
+| armv9.2_1    | -march=armv9.2-a+dotprod+fp16+nosve+i8mm+sme   |
+| armv9.2_2    | -march=armv9.2-a+dotprod+fp16+nosve+i8mm+sme   |
 
 
 > **NOTE**: If you need specific version of Java set the path in `JAVA_HOME` environment variable.
@@ -290,6 +291,7 @@ delivers effective inference times by striking a balance between computational e
 However, any model supported by the backend library could be used.
 
 > **NOTE**: Currently only Q4_0 models are accelerated by Arm® KleidiAI™ kernels in `llama.cpp`.
+
 
 ##### llama cpp multimodal
 
