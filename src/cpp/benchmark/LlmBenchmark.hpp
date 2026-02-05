@@ -1,5 +1,5 @@
 //
-// SPDX-FileCopyrightText: Copyright 2025 Arm Limited and/or its affiliates <open-source-office@arm.com>
+// SPDX-FileCopyrightText: Copyright 2025-2026 Arm Limited and/or its affiliates <open-source-office@arm.com>
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -53,14 +53,16 @@ public:
      * @param numIterations         ///< Number of measured benchmark iterations to run.
      * @param numWarmupIterations   ///< Number of warm-up iterations to run (ignored in stats).
      * @param sharedLibraryPath     ///< Shared library path.
+     * @param contextSize           ///< Context length (max tokens) for the model runtime.
      */
     LlmBenchmark(const std::string& modelPath,
-                 int numInputTokens,
-                 int numOutputTokens,
-                 int numThreads,
-                 int numIterations = 5,
-                 int numWarmupIterations = 1,
-                 const std::string& sharedLibraryPath="");
+                 const int numInputTokens,
+                 const int numOutputTokens,
+                 const int numThreads,
+                 const int numIterations = 5,
+                 const int numWarmupIterations = 1,
+                 const std::string& sharedLibraryPath="",
+                 const int contextSize = 2048);
     /**
      * Default deconstructor
      */
@@ -94,6 +96,7 @@ private:
     int m_numIterations;                    ///< Number of measured benchmark iterations
     int m_numWarmupIterations;              ///< Number of warm-up iterations (ignored in stats)
     std::string m_sharedLibraryPath;        ///< Shared library path
+    int m_contextSize;                      ///< Context length (max tokens)
 
     // Internal state
     LlmConfig m_config;                     ///< Local configuration used to initialize the LLM

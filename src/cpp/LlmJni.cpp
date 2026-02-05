@@ -363,6 +363,7 @@ Java_com_arm_Llm_runBenchmark(
     jstring jModelPath,
     jint jInputTokens,
     jint jOutputTokens,
+    jint jContextSize,
     jint jThreads,
     jint jIterations,
     jint jWarmupIterations,
@@ -394,7 +395,8 @@ Java_com_arm_Llm_runBenchmark(
             static_cast<int>(jThreads),
             static_cast<int>(jIterations),
             static_cast<int>(jWarmupIterations),
-            sharedLibraryPath
+            sharedLibraryPath,
+            static_cast<int>(jContextSize)
         );
 
         int rc = bench.Run();

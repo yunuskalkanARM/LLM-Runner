@@ -1,5 +1,5 @@
 //
-// SPDX-FileCopyrightText: Copyright 2025 Arm Limited and/or its affiliates <open-source-office@arm.com>
+// SPDX-FileCopyrightText: Copyright 2025-2026 Arm Limited and/or its affiliates <open-source-office@arm.com>
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -18,12 +18,13 @@ using namespace std::chrono;
 LlmBenchmark::~LlmBenchmark() {}
 
 LlmBenchmark::LlmBenchmark(const std::string& modelPath,
-                           int numInputTokens,
-                           int numOutputTokens,
-                           int numThreads,
-                           int numIterations,
-                           int numWarmupIterations,
-                           const std::string& sharedLibraryPath)
+                           const int numInputTokens,
+                           const int numOutputTokens,
+                           const int numThreads,
+                           const int numIterations,
+                           const int numWarmupIterations,
+                           const std::string& sharedLibraryPath,
+                           const int contextSize)
     : m_modelPath(modelPath)
     , m_numInputTokens(numInputTokens)
     , m_numOutputTokens(numOutputTokens)
@@ -31,6 +32,7 @@ LlmBenchmark::LlmBenchmark(const std::string& modelPath,
     , m_numIterations(numIterations)
     , m_numWarmupIterations(numWarmupIterations)
     , m_sharedLibraryPath(sharedLibraryPath)
+    , m_contextSize(contextSize)
     , m_config(R"JSON(
         {
             "chat" : {
@@ -57,6 +59,7 @@ void LlmBenchmark::InitConfig()
     // Fill config path & threads
     m_config.SetConfigString(LlmConfig::ConfigParam::LlmModelName, m_modelPath);
     m_config.SetConfigInt(LlmConfig::ConfigParam::NumThreads, m_numThreads);
+    m_config.SetConfigInt(LlmConfig::ConfigParam::ContextSize, m_contextSize);
 }
 
 void LlmBenchmark::InitLlm()
@@ -176,6 +179,7 @@ std::string LlmBenchmark::GetResults() const
     oss << "  model_path         : " << m_modelPath << "\n";
     oss << "  num_input_tokens   : " << m_numInputTokens << "\n";
     oss << "  num_output_tokens  : " << m_numOutputTokens << "\n";
+    oss << "  context_size       : " << m_contextSize << "\n";
     oss << "  num_threads        : " << m_numThreads << "\n";
     oss << "  num_iterations     : " << m_numIterations << "\n";
     oss << "  num_warmup         : " << m_numWarmupIterations << "\n\n";
@@ -271,6 +275,17 @@ std::string LlmBenchmark::GetResults() const
 int LlmBenchmark::Run()
 {
     try {
+        const int requiredTokens = m_numInputTokens + m_numOutputTokens;
+        if (m_contextSize <= requiredTokens) {
+            LOG_ERROR("context_size (%d) must be greater than "
+                      "num_input_tokens + num_output_tokens (%d + %d = %d).",
+                      m_contextSize,
+                      m_numInputTokens,
+                      m_numOutputTokens,
+                      requiredTokens);
+            return 1;
+        }
+
         InitConfig();
         InitLlm();
         PreparePayload();

@@ -1,5 +1,5 @@
 //
-// SPDX-FileCopyrightText: Copyright 2025 Arm Limited and/or its affiliates <open-source-office@arm.com>
+// SPDX-FileCopyrightText: Copyright 2025-2026 Arm Limited and/or its affiliates <open-source-office@arm.com>
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -68,6 +68,7 @@ public class LlmTestJNI {
             modelName,
             128, /* Input tokens size */
             64,  /* Output tokens size */
+            512, /* Context size */
             1,   /* Number of threads */
             3,   /* Number of iterations */
             1,   /* Number of warm up */

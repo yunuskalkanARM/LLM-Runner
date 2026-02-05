@@ -1,5 +1,5 @@
 //
-// SPDX-FileCopyrightText: Copyright 2024-2025 Arm Limited and/or its affiliates <open-source-office@arm.com>
+// SPDX-FileCopyrightText: Copyright 2024-2026 Arm Limited and/or its affiliates <open-source-office@arm.com>
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -359,6 +359,7 @@ public class Llm {
      * @param modelPath         Path to the model / config used by the LLM.
      * @param inputTokens       Number of input tokens for the prompt.
      * @param outputTokens      Number of tokens to generate in decode.
+     * @param contextSize       Context length in tokens.
      * @param threads           Number of threads to use.
      * @param iterations        Number of measured iterations.
      * @param warmupIterations  Number of warmup iterations (ignored in stats).
@@ -369,6 +370,7 @@ public class Llm {
         String modelPath,
         int inputTokens,
         int outputTokens,
+        int contextSize,
         int threads,
         int iterations,
         int warmupIterations,

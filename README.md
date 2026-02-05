@@ -499,6 +499,7 @@ Instead of writing your own prompts or relying on framework-specific benchmarkin
     --output    <tokens>              | -o <tokens> \
     --threads   <num_threads>         | -t <num_threads> \
     --iterations <num_iterations>     | -n <num_iterations> \
+    [ --context <tokens>              | -c <tokens> ] \
     [ --warmup <warmup_iterations>    | -w <warmup_iterations> ]
 ```
 
@@ -510,6 +511,7 @@ Instead of writing your own prompts or relying on framework-specific benchmarkin
     -m ./resources_downloaded/models/llama.cpp/llama-3.2-1b/Llama-3.2-1B-Instruct-Q4_0.gguf \
     -i 128 \
     -o 64 \
+    -c 2048 \
     -t 4 \
     -n 3 \
     -w 1
@@ -524,8 +526,9 @@ Parameters:
   model_path         : ./resources_downloaded/models/llama.cpp/llama-3.2-1b/Llama-3.2-1B-Instruct-Q4_0.gguf
   num_input_tokens   : 128
   num_output_tokens  : 64
-  num_threads        : 5
-  num_iterations     : 5
+  context_size       : 2048
+  num_threads        : 4
+  num_iterations     : 3
   num_warmup         : 1
 
 
@@ -555,4 +558,3 @@ For a list of common errors and their fixes, see TROUBLESHOOTING.md.
 
 This project is distributed under the software licenses in [LICENSES](LICENSES) directory.
 The licenses of supported models can be seen in [Supported Models section](#supported-models).
-

@@ -6,7 +6,9 @@
 
 #include "LlmBenchmark.hpp"
 #include <cstdlib>
+#include <filesystem>
 #include <iostream>
+#include <stdexcept>
 #include <string>
 
 static void PrintUsage(const char* prog)
@@ -19,12 +21,14 @@ static void PrintUsage(const char* prog)
               << " --output <tokens>"
               << " --threads <n>"
               << " --iterations <n>"
+              << " [--context <tokens>]"
               << " [--warmup <n>] [--help]\n\n";
 
     std::cerr << "Options:\n";
     std::cerr << "  --model,     -m    Path to LLM model config/file\n";
     std::cerr << "  --input,     -i    Number of input tokens for benchmark\n";
     std::cerr << "  --output,    -o    Number of output tokens to generate\n";
+    std::cerr << "  --context,   -c    Context length (tokens), power of two (default: 2048)\n";
     std::cerr << "  --threads,   -t    Number of runtime threads\n";
     std::cerr << "  --iterations,-n    Number of benchmark iterations (default: 5)\n";
     std::cerr << "  --warmup,    -w    Number of warm-up iterations (default: 1)\n";
@@ -34,6 +38,7 @@ static void PrintUsage(const char* prog)
     std::cerr << "  " << prog
               << " --model models/llama2.json"
               << " --input 128 --output 128"
+              << " --context 2048"
               << " --threads 4 --iterations 5 --warmup 2\n\n";
 }
 
@@ -49,8 +54,10 @@ int main(int argc, char** argv)
     int numInputTokens   = 0;
     int numOutputTokens  = 0;
     int numThreads       = 0;
+    int contextSize      = 2048;
     int numIterations    = 5;   // default num of iterations
     int numWarmup        = 1;   // default warm-up
+
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -69,29 +76,53 @@ int main(int argc, char** argv)
             }
         };
 
+        auto parseIntArg = [&](const std::string& name) -> int {
+            requireValue(name);
+            try {
+                std::size_t consumed = 0;
+                const std::string valueStr = argv[i + 1];
+                int value = std::stoi(valueStr, &consumed, 10);
+                if (consumed != valueStr.size()) {
+                    throw std::invalid_argument("Trailing characters");
+                }
+                ++i; // consume value
+                return value;
+            } catch (const std::exception&) {
+                std::cerr << "Invalid integer value for argument: " << name << "\n";
+                PrintUsage(argv[0]);
+                std::exit(1);
+            }
+        };
+
         if (arg == "--model" || arg == "-m") {
             requireValue(arg);
             modelPath = argv[++i];
         }
         else if (arg == "--input" || arg == "-i") {
-            requireValue(arg);
-            numInputTokens = std::atoi(argv[++i]);
+            numInputTokens = parseIntArg(arg);
         }
         else if (arg == "--output" || arg == "-o") {
-            requireValue(arg);
-            numOutputTokens = std::atoi(argv[++i]);
+            numOutputTokens = parseIntArg(arg);
+        }
+        else if (arg == "--context" || arg == "--context-size" || arg == "-c") {
+            contextSize = parseIntArg(arg);
+                auto isPowerOfTwo = [](int value) {
+                    return value > 0 && (value & (value - 1)) == 0;
+                };
+            if (!isPowerOfTwo(contextSize)) {
+                std::cerr << "Invalid context length: " << contextSize << "\n";
+                std::cerr << "Context length must be a positive power of two.\n";
+                return 1;
+            }
         }
         else if (arg == "--threads" || arg == "-t") {
-            requireValue(arg);
-            numThreads = std::atoi(argv[++i]);
+            numThreads = parseIntArg(arg);
         }
         else if (arg == "--iterations" || arg == "-n") {
-            requireValue(arg);
-            numIterations = std::atoi(argv[++i]);
+            numIterations = parseIntArg(arg);
         }
         else if (arg == "--warmup" || arg == "-w") {
-            requireValue(arg);
-            numWarmup = std::atoi(argv[++i]);
+            numWarmup = parseIntArg(arg);
         }
         else {
             std::cerr << "Unknown or incomplete argument: " << arg << "\n";
@@ -121,7 +152,8 @@ int main(int argc, char** argv)
                        numThreads,
                        numIterations,
                        numWarmup,
-                       sharedLibraryPath);
+                       sharedLibraryPath,
+                       contextSize);
 
     int rc = bench.Run();
     auto results = bench.GetResults();
