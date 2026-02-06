@@ -13,6 +13,8 @@
 #include <fstream>
 #include <array>
 #include <string>
+#include <cstdlib>
+#include <cctype>
 
 #include "catch2/catch_test_macros.hpp"
 #include "catch2/catch_session.hpp"
@@ -25,6 +27,8 @@
 std::string s_configFilePath{""};
 std::string s_modelRootDir{""};
 std::string s_backendSharedLibraryDir{""};
+bool s_debugResponses{false};
+std::string s_transcriptPath{""};
 
 static int maxTokenRetrievalAttempts = 10000;
 static int testCtxLength = 73;       // Arbitrary truncated value to emulate faster end  of context.
@@ -41,6 +45,19 @@ int main(int argc, char* argv[])
     std::string configFilePath;
     std::string modelsRootDir;
     std::string backendSharedLibraryDir;
+    bool debugResponses = false;
+    std::string transcriptPath;
+
+    if (const char* env = std::getenv("LLM_TEST_DEBUG_RESPONSES")) {
+        std::string v(env);
+        for (auto& c : v) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        if (v == "1" || v == "true" || v == "yes" || v == "on") {
+            debugResponses = true;
+        }
+    }
+    if (const char* env = std::getenv("LLM_TEST_TRANSCRIPT_PATH")) {
+        transcriptPath = env;
+    }
 
     auto cli = session.cli() |
         Opt(configFilePath, "configFile")["--config"]
@@ -48,7 +65,11 @@ int main(int argc, char* argv[])
         Opt(modelsRootDir, "modelRootDir")["--model-root"]
             ("Directory containing LLM model files") |
         Opt(backendSharedLibraryDir, "sharedLibraryDir")["--backend-shared-lib-dir"]
-            ("Directory containing backend shared libraries");
+            ("Directory containing backend shared libraries") |
+        Opt(debugResponses)["--debug-responses"]
+            ("Print prompts/responses and config summary to stdout (also supports env: LLM_TEST_DEBUG_RESPONSES=1)") |
+        Opt(transcriptPath, "path")["--transcript"]
+            ("Append prompts/responses to a transcript file (also supports env: LLM_TEST_TRANSCRIPT_PATH)");
 
     session.cli(cli);
 
@@ -63,8 +84,37 @@ int main(int argc, char* argv[])
     s_configFilePath = configFilePath;
     s_modelRootDir = modelsRootDir;
     s_backendSharedLibraryDir = backendSharedLibraryDir;
+    s_debugResponses = debugResponses;
+    s_transcriptPath = transcriptPath;
 
     return session.run();
+}
+
+static void DebugPrint(const std::string& label, const std::string& value)
+{
+    if (s_debugResponses) {
+        std::cout << label << value << std::endl;
+    }
+    if (s_transcriptPath.empty()) {
+        return;
+    }
+    std::ofstream out(s_transcriptPath, std::ios::app);
+    if (!out) {
+        return;
+    }
+    out << label << value << "\n";
+}
+
+static void TranscriptSeparator()
+{
+    if (s_transcriptPath.empty()) {
+        return;
+    }
+    std::ofstream out(s_transcriptPath, std::ios::app);
+    if (!out) {
+        return;
+    }
+    out << "----\n";
 }
 
 /**
@@ -128,6 +178,43 @@ LlmConfig SetupTestConfig()
     return configTest;
 }
 
+static std::string Truncate(std::string s, size_t maxLen)
+{
+    if (s.size() <= maxLen) {
+        return s;
+    }
+    s.resize(maxLen);
+    s += "...";
+    return s;
+}
+
+static std::string ConfigSummary(const LlmConfig& config)
+{
+    std::ostringstream oss;
+    oss << "framework=" << LLM::GetFrameworkType();
+    oss << ", model=" << config.GetConfigString(LlmConfig::ConfigParam::LlmModelName);
+
+    const std::string proj = config.GetConfigString(LlmConfig::ConfigParam::ProjModelName);
+    if (!proj.empty()) {
+        oss << ", projModel=" << proj;
+    }
+
+    oss << ", isVision=" << (config.GetConfigBool(LlmConfig::ConfigParam::IsVision) ? "true" : "false");
+    oss << ", contextSize=" << config.GetConfigInt(LlmConfig::ConfigParam::ContextSize);
+    oss << ", batchSize=" << config.GetConfigInt(LlmConfig::ConfigParam::BatchSize);
+    oss << ", numThreads=" << config.GetConfigInt(LlmConfig::ConfigParam::NumThreads);
+    oss << ", applyDefaultChatTemplate="
+        << (config.GetConfigBool(LlmConfig::ConfigParam::ApplyDefaultChatTemplate) ? "true" : "false");
+
+    const std::string systemPrompt = config.GetConfigString(LlmConfig::ConfigParam::SystemPrompt);
+    if (!systemPrompt.empty()) {
+        oss << ", systemPrompt=" << Truncate(systemPrompt, 80);
+    }
+
+    oss << ", stopWords=" << config.GetStopWords().size();
+    return oss.str();
+}
+
 /**
  * Ensure correct LLM implementation is selected based on supported modalities.
  */
@@ -157,13 +244,24 @@ TEST_CASE("LLM Wrapper: End-to-end text and vision tests")
     LLM llm{};
     std::string question = "What is the capital of France?" ;
 
+    INFO("Config file: " << s_configFilePath);
+    INFO("Model root directory: " << s_modelRootDir);
+    INFO("Backend shared library directory: " << s_backendSharedLibraryDir);
+    INFO("Config summary: " << ConfigSummary(configTest));
+
+    TranscriptSeparator();
+    DebugPrint("Config file: ", s_configFilePath);
+    DebugPrint("Model root directory: ", s_modelRootDir);
+    DebugPrint("Backend shared library directory: ", s_backendSharedLibraryDir);
+    DebugPrint("Config summary: ", ConfigSummary(configTest));
+
     auto checkContextFullError = [](const std::runtime_error& e) {
         CHECK(std::string(e.what()).find("context is full") != std::string::npos);
     };
 
-    /**
-     * Multimodal tests: vision enabled
-     */
+    //
+    // Multimodal tests (vision enabled)
+    //
     if (configTest.GetConfigBool(LlmConfig::ConfigParam::IsVision))
     {
         SECTION("Vision: Describe objects in images")
@@ -186,8 +284,15 @@ TEST_CASE("LLM Wrapper: End-to-end text and vision tests")
                 std::string prompt = "Can you describe this image briefly?";
                 LlmChat::Payload payload{prompt, std::string{TEST_RESOURCE_DIR} + "/" + c.file, isFirstMessage};
 
+                CAPTURE(prompt);
+                CAPTURE(payload.imagePath);
                 llm.Encode(payload);
                 std::string response = DecodeTokens(llm, 1);
+                CAPTURE(c.file);
+                INFO("Response: " << response);
+                DebugPrint("Prompt: ", prompt);
+                DebugPrint("Image: ", payload.imagePath);
+                DebugPrint("Response: ", response);
 
                 bool match = false;
                 for (const auto& expect : c.expects) {
@@ -211,16 +316,26 @@ TEST_CASE("LLM Wrapper: End-to-end text and vision tests")
             std::string prompt = "What type of dress can you see in this image?";
             LlmChat::Payload payload{prompt, std::string{TEST_RESOURCE_DIR} + "/kimono.bmp", true};
 
+            CAPTURE(prompt);
+            CAPTURE(payload.imagePath);
             llm.Encode(payload);
             std::string response1 = DecodeTokens(llm, 2);
+            INFO("Response: " << response1);
+            DebugPrint("Prompt: ", prompt);
+            DebugPrint("Image: ", payload.imagePath);
+            DebugPrint("Response: ", response1);
             CHECK(response1.find("kimono") != std::string::npos);
 
             payload.textPrompt = "Which country does that dress belong to?";
             payload.isFirstMessage = false;
             payload.imagePath = "";
 
+            CAPTURE(payload.textPrompt);
             llm.Encode(payload);
             std::string response2 = DecodeTokens(llm, 3);
+            INFO("Response: " << response2);
+            DebugPrint("Prompt: ", payload.textPrompt);
+            DebugPrint("Response: ", response2);
             CHECK(response2.find("Japan") != std::string::npos);
 
             llm.FreeLlm();
@@ -236,8 +351,14 @@ TEST_CASE("LLM Wrapper: End-to-end text and vision tests")
                 true
             };
 
+            CAPTURE(payload.textPrompt);
+            CAPTURE(payload.imagePath);
             llm.Encode(payload);
             std::string response = DecodeTokens(llm, 4);
+            INFO("Response: " << response);
+            DebugPrint("Prompt: ", payload.textPrompt);
+            DebugPrint("Image: ", payload.imagePath);
+            DebugPrint("Response: ", response);
             CHECK(response.find("tiger") != std::string::npos);
 
             llm.ResetContext();
@@ -246,9 +367,13 @@ TEST_CASE("LLM Wrapper: End-to-end text and vision tests")
             payload.imagePath = "";
             payload.isFirstMessage = false;
 
+            CAPTURE(payload.textPrompt);
             llm.Encode(payload);
             std::string response2 = DecodeTokens(llm, 5);
 
+            INFO("Response: " << response2);
+            DebugPrint("Prompt: ", payload.textPrompt);
+            DebugPrint("Response: ", response2);
             CHECK(response2.find("tiger") == std::string::npos);
             llm.FreeLlm();
         }
@@ -268,11 +393,14 @@ TEST_CASE("LLM Wrapper: End-to-end text and vision tests")
 
             try {
                 while (llm.GetChatProgress() < 100) {
+                    CAPTURE(payload.textPrompt);
                     llm.Encode(payload);
                     payload.textPrompt = "Tell me more about this image?";
                     payload.isFirstMessage = false;
                 }
             } catch (const std::runtime_error& e) {
+                INFO("Exception: " << e.what());
+                DebugPrint("Exception: ", e.what());
                 checkContextFullError(e);
             }
 
@@ -280,17 +408,21 @@ TEST_CASE("LLM Wrapper: End-to-end text and vision tests")
         }
     }
 
-    /**
-     * Pure text tests
-     */
+    //
+    // Pure text tests
+    //
     SECTION("Text: Simple query/response")
     {
         llm.LlmInit(configTest, s_backendSharedLibraryDir);
 
         LlmChat::Payload payload{question, "", true};
+        CAPTURE(question);
         llm.Encode(payload);
 
         std::string response = DecodeTokens(llm, 6);
+        INFO("Response: " << response);
+        DebugPrint("Prompt: ", question);
+        DebugPrint("Response: ", response);
         CHECK(response.find("Paris") != std::string::npos);
 
         llm.FreeLlm();
@@ -322,6 +454,8 @@ TEST_CASE("LLM Wrapper: End-to-end text and vision tests")
         try {
             llm.Encode(payload);
         } catch (const std::runtime_error& e) {
+            INFO("Exception: " << e.what());
+            DebugPrint("Exception: ", e.what());
             checkContextFullError(e);
         }
         llm.FreeLlm();
@@ -340,6 +474,8 @@ TEST_CASE("LLM Wrapper: End-to-end text and vision tests")
                 payload.isFirstMessage = false;
                 DecodeTokens(llm, 7);
             } catch (const std::runtime_error& e) {
+                INFO("Exception: " << e.what());
+                DebugPrint("Exception: ", e.what());
                 checkContextFullError(e);
                 break;
             }

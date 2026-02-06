@@ -6,3 +6,5 @@ cmake-build-*/
 build*/
 # Ignore coverage build directory
 build_coverage/
+__pycache__/
+*.pyc

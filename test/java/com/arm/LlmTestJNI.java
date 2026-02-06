@@ -31,12 +31,112 @@ public class LlmTestJNI {
     private static final String sharedLibraryDir = System.getProperty("java.library.path");
     private static final String backendSharedLibDir = System.getProperty("backend.shared.lib.dir");
     private static JSONObject configJson;
+    private static final boolean DEBUG = Boolean.parseBoolean(System.getProperty("llm.tests.debug", "false"));
+    private static final String TRANSCRIPT_PATH = System.getProperty("llm.tests.transcript", "");
 
-    private void checkLlmMatch(String response, String expected, boolean shouldContain) {
+    private static String summarizeConfigForDebug() {
+        try {
+            JSONObject modelObj = configJson.getJSONObject("model");
+            JSONObject runtimeObj = configJson.optJSONObject("runtime");
+            JSONObject chatObj = configJson.optJSONObject("chat");
+
+            String modelName = modelObj.optString("llmModelName", "<missing>");
+            String projModel = modelObj.optString("projModelName", "");
+            boolean isVision = modelObj.optBoolean("isVision", false);
+
+            int contextSize = runtimeObj != null ? runtimeObj.optInt("contextSize", -1) : -1;
+            int batchSize = runtimeObj != null ? runtimeObj.optInt("batchSize", -1) : -1;
+            int numThreads = runtimeObj != null ? runtimeObj.optInt("numThreads", -1) : -1;
+
+            boolean applyDefaultChatTemplate =
+                chatObj != null && chatObj.has("applyDefaultChatTemplate") && chatObj.optBoolean("applyDefaultChatTemplate");
+
+            return "model=" + modelName
+                + (projModel.isEmpty() ? "" : (", projModel=" + projModel))
+                + ", isVision=" + isVision
+                + ", contextSize=" + contextSize
+                + ", batchSize=" + batchSize
+                + ", numThreads=" + numThreads
+                + ", applyDefaultChatTemplate=" + applyDefaultChatTemplate;
+        } catch (Exception e) {
+            return "<failed to summarize config: " + e.getMessage() + ">";
+        }
+    }
+
+    private static void appendTranscript(String text) {
+        if (TRANSCRIPT_PATH == null || TRANSCRIPT_PATH.isEmpty()) {
+            return;
+        }
+        try (FileWriter fw = new FileWriter(TRANSCRIPT_PATH, true);
+             BufferedWriter bw = new BufferedWriter(fw)) {
+            bw.write(text);
+            if (!text.endsWith("\n")) {
+                bw.newLine();
+            }
+        } catch (IOException e) {
+            if (DEBUG) {
+                System.err.println("Transcript write failed: " + e.getMessage());
+            }
+        }
+    }
+
+    private static void transcriptSeparator() {
+        appendTranscript("----");
+    }
+
+    private static String getResponseOrFail(Llm llm, String prompt) {
+        try {
+            String response = llm.getResponse(prompt);
+            if (DEBUG) {
+                System.out.println("Prompt: " + prompt);
+                System.out.println("Response: " + response);
+            }
+            if (TRANSCRIPT_PATH != null && !TRANSCRIPT_PATH.isEmpty()) {
+                appendTranscript("Prompt: " + prompt);
+                appendTranscript("Response: " + response);
+            }
+            return response;
+        } catch (RuntimeException e) {
+            String msg = "getResponse failed."
+                + "\nprompt: " + prompt
+                + "\nconfig: " + configFilePath
+                + "\nmodelRoot: " + modelDir
+                + "\nbackendSharedLibDir: " + backendSharedLibDir
+                + "\nconfigSummary: " + summarizeConfigForDebug()
+                + "\nerror: " + e.getMessage();
+            transcriptSeparator();
+            appendTranscript("getResponse failed");
+            appendTranscript("prompt: " + prompt);
+            appendTranscript("config: " + configFilePath);
+            appendTranscript("modelRoot: " + modelDir);
+            appendTranscript("backendSharedLibDir: " + backendSharedLibDir);
+            appendTranscript("configSummary: " + summarizeConfigForDebug());
+            appendTranscript("error: " + e.getMessage());
+            throw new AssertionError(msg, e);
+        }
+    }
+
+    private static void checkLlmMatch(String prompt, String response, String expected, boolean shouldContain) {
         if (shouldContain) {
-            assertTrue("Expected response to contain: " + expected +" but response is: " + response, response.contains(expected));
+            assertTrue(
+                "Expected response to contain: " + expected
+                    + "\nprompt: " + prompt
+                    + "\nresponse: " + response
+                    + "\nconfig: " + configFilePath
+                    + "\nmodelRoot: " + modelDir
+                    + "\nbackendSharedLibDir: " + backendSharedLibDir
+                    + "\nconfigSummary: " + summarizeConfigForDebug(),
+                response.contains(expected));
         } else {
-            assertFalse("Expected response to not contain: " + expected, response.contains(expected));
+            assertFalse(
+                "Expected response to NOT contain: " + expected
+                    + "\nprompt: " + prompt
+                    + "\nresponse: " + response
+                    + "\nconfig: " + configFilePath
+                    + "\nmodelRoot: " + modelDir
+                    + "\nbackendSharedLibDir: " + backendSharedLibDir
+                    + "\nconfigSummary: " + summarizeConfigForDebug(),
+                response.contains(expected));
         }
     }
 
@@ -53,6 +153,21 @@ public class LlmTestJNI {
                 if (!projModelName.isEmpty()) {
                     modelObj.put("projModelName", modelDir + "/" + projModelName);
                 }   
+            }
+            if (DEBUG) {
+                System.out.println("JNI test config loaded.");
+                System.out.println("config: " + configFilePath);
+                System.out.println("modelRoot: " + modelDir);
+                System.out.println("backendSharedLibDir: " + backendSharedLibDir);
+                System.out.println("configSummary: " + summarizeConfigForDebug());
+            }
+            if (TRANSCRIPT_PATH != null && !TRANSCRIPT_PATH.isEmpty()) {
+                transcriptSeparator();
+                appendTranscript("JNI test config loaded");
+                appendTranscript("config: " + configFilePath);
+                appendTranscript("modelRoot: " + modelDir);
+                appendTranscript("backendSharedLibDir: " + backendSharedLibDir);
+                appendTranscript("configSummary: " + summarizeConfigForDebug());
             }
         } catch (IOException e) {
             throw new RuntimeException("Failed to load config JSON", e);
@@ -103,8 +218,8 @@ public class LlmTestJNI {
         Llm llm = new Llm();
         llm.llmInit(configJson.toString(), backendSharedLibDir);
         String question = "What is your name?";
-        String response = llm.getResponse(question);
-        checkLlmMatch(response, "Ferdia", true);
+        String response = getResponseOrFail(llm, question);
+        checkLlmMatch(question, response, "Ferdia", true);
         llm.freeModel();
         // Revert the configJson to preserve original system prompt and modelTag
         chatObj.put("systemPrompt",oldSystemPrompt);
@@ -116,15 +231,15 @@ public class LlmTestJNI {
         llm.llmInit(configJson.toString(), backendSharedLibDir);
 
         String question1 = "What is the capital of Canada?";
-        String response1 = llm.getResponse(question1);
-        checkLlmMatch(response1, "Ottawa", true);
+        String response1 = getResponseOrFail(llm, question1);
+        checkLlmMatch(question1, response1, "Ottawa", true);
 
         // Resetting context should cause model to forget what country is being referred to
         llm.resetContext();
 
         String question2 = "What country is that capital of? Reply with one word. please.";
-        String response2 = llm.getResponse(question2);
-        checkLlmMatch(response2, "Canada", false);
+        String response2 = getResponseOrFail(llm, question2);
+        checkLlmMatch(question2, response2, "Canada", false);
         llm.freeModel();
       
     }
@@ -135,12 +250,12 @@ public class LlmTestJNI {
         llm.llmInit(configJson.toString(), backendSharedLibDir);
 
         String question1 = "What is the capital of Canada?";
-        String response1 = llm.getResponse(question1);
-        checkLlmMatch(response1, "Ottawa", true);
+        String response1 = getResponseOrFail(llm, question1);
+        checkLlmMatch(question1, response1, "Ottawa", true);
 
         String question2 = "What country is that capital of? Reply with one word.";
-        String response2 = llm.getResponse(question2);
-        checkLlmMatch(response2, "Canada", true);
+        String response2 = getResponseOrFail(llm, question2);
+        checkLlmMatch(question2, response2, "Canada", true);
         llm.freeModel();
     }
 
@@ -153,21 +268,21 @@ public class LlmTestJNI {
         frenchLlm.llmInit(configJson.toString(), backendSharedLibDir);
 
         String germanQuestion1 = "What is the capital of Germany?";
-        String germanResponse1 = germanLlm.getResponse(germanQuestion1);
-        checkLlmMatch(germanResponse1, "Berlin", true);
+        String germanResponse1 = getResponseOrFail(germanLlm, germanQuestion1);
+        checkLlmMatch(germanQuestion1, germanResponse1, "Berlin", true);
 
         String frenchQuestion1 = "What is the capital of France?";
-        String frenchResponse1 = frenchLlm.getResponse(frenchQuestion1);
-        checkLlmMatch(frenchResponse1, "Paris", true);
+        String frenchResponse1 = getResponseOrFail(frenchLlm, frenchQuestion1);
+        checkLlmMatch(frenchQuestion1, frenchResponse1, "Paris", true);
 
         String germanQuestion2 = "What languages do they speak there?";
-        String germanResponse2 = germanLlm.getResponse(germanQuestion2);
-        checkLlmMatch(germanResponse2, "German", true);
+        String germanResponse2 = getResponseOrFail(germanLlm, germanQuestion2);
+        checkLlmMatch(germanQuestion2, germanResponse2, "German", true);
         germanLlm.freeModel();
 
         String frenchQuestion2 = "What languages do they speak there?";
-        String frenchResponse2 = frenchLlm.getResponse(frenchQuestion2);
-        checkLlmMatch(frenchResponse2, "French", true);
+        String frenchResponse2 = getResponseOrFail(frenchLlm, frenchQuestion2);
+        checkLlmMatch(frenchQuestion2, frenchResponse2, "French", true);
         frenchLlm.freeModel();
     }
 
@@ -176,15 +291,15 @@ public class LlmTestJNI {
         Llm llm = new Llm();
         llm.llmInit(configJson.toString(), backendSharedLibDir);
         String question1 = "Paris is the capital of what country?";
-        String response1 = llm.getResponse(question1);
-        checkLlmMatch(response1, "France", true);
+        String response1 = getResponseOrFail(llm, question1);
+        checkLlmMatch(question1, response1, "France", true);
 
         // Send an empty prompt to simulate blank recordings or non-speech tokens being returned by speech recognition;
         // then ask follow-up questions to ensure previous context persists when an empty prompt is injected in the conversation.
         String emptyResponse = llm.getResponse("");
         String question3 = "What languages do they speak there?";
-        String response3 = llm.getResponse(question3);
-        checkLlmMatch(response3, "French", true);
+        String response3 = getResponseOrFail(llm, question3);
+        checkLlmMatch(question3, response3, "French", true);
         llm.freeModel();
     }
 
@@ -199,12 +314,12 @@ public class LlmTestJNI {
 
         // Set the initial ground truth in the conversation.
         String initialContext = "There are " + originalMangoes + " mangoes in a basket.";
-        String initResponse = llm.getResponse(initialContext);
+        String initResponse = getResponseOrFail(llm, initialContext);
         String originalQuery = "How many mangoes did we start with, just reply with a single numerical digit?";
         String subtractQuery = "Remove 1 mango from the basket. How many mangoes left in the basket now, just reply with a single numerical digit?";
 
         // **Assert that the model acknowledges the context is related with mango.**
-        checkLlmMatch(initResponse, "mango", true);
+        checkLlmMatch(initialContext, initResponse, "mango", true);
 
         // Loop to subtract 1 mango each iteration until reaching 0.
         for (int i = 1; i < originalMangoes; i++) {
@@ -215,21 +330,21 @@ public class LlmTestJNI {
             }
 
             // Query to subtract one mango
-            String subtractionResponse = llm.getResponse(subtractQuery);
+            String subtractionResponse = getResponseOrFail(llm, subtractQuery);
             mangoes -= 1;  // Update our expected count
-            checkLlmMatch(subtractionResponse, String.valueOf(mangoes), true);
+            checkLlmMatch(subtractQuery, subtractionResponse, String.valueOf(mangoes), true);
 
             // Test if model still recalls the starting number
             if (i == originalMangoes - 1) {
-                String response = llm.getResponse(originalQuery);
-                checkLlmMatch(response, String.valueOf(originalMangoes), true);
+                String response = getResponseOrFail(llm, originalQuery);
+                checkLlmMatch(originalQuery, response, String.valueOf(originalMangoes), true);
                 llm.resetContext();
             }
 
         }
 
-        String postResetResponse = llm.getResponse(originalQuery);
-        checkLlmMatch(postResetResponse, String.valueOf(originalMangoes), false);
+        String postResetResponse = getResponseOrFail(llm, originalQuery);
+        checkLlmMatch(originalQuery, postResetResponse, String.valueOf(originalMangoes), false);
         llm.freeModel();
     }
 
@@ -243,24 +358,24 @@ public class LlmTestJNI {
         // First Question
         String question1 = "What is the capital of Canada?";
     
-        String response1 = llm.getResponse(question1);
-        checkLlmMatch(response1, "Ottawa", true);
+        String response1 = getResponseOrFail(llm, question1);
+        checkLlmMatch(question1, response1, "Ottawa", true);
         // Reset Context before second question
         llm.resetContext();
 
         // Second Question (After Reset)
         String question2 = "What country is that capital of? Reply with one word.";
-        String response2 = llm.getResponse(question2);
-        checkLlmMatch(response2, "Canada", false);
+        String response2 = getResponseOrFail(llm, question2);
+        checkLlmMatch(question2, response2, "Canada", false);
         // Ask First Question Again. Note an additional reset is required to prevent the generic answer
         // from previous question affecting new topic.
         llm.resetContext();
-        String response3 = llm.getResponse(question1);
+        String response3 = getResponseOrFail(llm, question1);
 
-        checkLlmMatch(response3, "Ottawa", true);
-        String response4 = llm.getResponse(question2);
+        checkLlmMatch(question1, response3, "Ottawa", true);
+        String response4 = getResponseOrFail(llm, question2);
 
-        checkLlmMatch(response4, "Canada", true);
+        checkLlmMatch(question2, response4, "Canada", true);
         llm.freeModel();
     }
 }
