@@ -87,7 +87,18 @@ public:
      */
     std::string GetResults() const;
 
+    /**
+     * Return the last benchmark iteration results as a JSON string.
+     * @return JSON string summarizing performance results.
+     */
+    std::string GetResultsJson() const;
+
 private:
+    struct SummaryStats {
+        IterationResult mean{};
+        IterationResult stddev{};
+    };
+
     // User-provided benchmark parameters
     std::string m_modelPath;                ///< Path to model config / model file
     int m_numInputTokens;                   ///< Input prompt size in tokens
@@ -146,6 +157,12 @@ private:
      * @return IterationResult with timings and throughput metrics.
      */
     IterationResult RunSingleIteration(int iterationIndex);
+
+    /**
+     * Compute mean/stddev over current results.
+     * @return SummaryStats containing mean and standard deviation metrics.
+     */
+    SummaryStats ComputeSummaryStats() const;
 };
 
 #endif /* LLM_BENCH_HPP */

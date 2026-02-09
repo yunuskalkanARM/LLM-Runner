@@ -78,6 +78,19 @@ public class LlmTestJNI {
         System.out.println("Benchmark done.");
         String result = llm.getBenchmarkResults();
         System.out.println(result);
+
+        String jsonResult = llm.getBenchmarkResultsJson();
+        String configBaseName = Paths.get(configFilePath).getFileName().toString();
+        int extIndex = configBaseName.lastIndexOf('.');
+        if (extIndex > 0) {
+            configBaseName = configBaseName.substring(0, extIndex);
+        }
+        String outputFileName = configBaseName + ".benchmark.json";
+        try {
+            Files.writeString(Paths.get(outputFileName), jsonResult);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to write benchmark JSON to " + outputFileName, e);
+        }
     }
 
     @Test

@@ -7,6 +7,7 @@
 #include "LlmBenchmark.hpp"
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -22,17 +23,19 @@ static void PrintUsage(const char* prog)
               << " --threads <n>"
               << " --iterations <n>"
               << " [--context <tokens>]"
+              << " [--json-output <path>]"
               << " [--warmup <n>] [--help]\n\n";
 
     std::cerr << "Options:\n";
-    std::cerr << "  --model,     -m    Path to LLM model config/file\n";
-    std::cerr << "  --input,     -i    Number of input tokens for benchmark\n";
-    std::cerr << "  --output,    -o    Number of output tokens to generate\n";
-    std::cerr << "  --context,   -c    Context length (tokens), power of two (default: 2048)\n";
-    std::cerr << "  --threads,   -t    Number of runtime threads\n";
-    std::cerr << "  --iterations,-n    Number of benchmark iterations (default: 5)\n";
-    std::cerr << "  --warmup,    -w    Number of warm-up iterations (default: 1)\n";
-    std::cerr << "  --help,      -h    Show this help message and exit\n\n";
+    std::cerr << "  --model,       -m    Path to LLM model config/file\n";
+    std::cerr << "  --input,       -i    Number of input tokens for benchmark\n";
+    std::cerr << "  --output,      -o    Number of output tokens to generate\n";
+    std::cerr << "  --context,     -c    Context length (tokens), power of two (default: 2048)\n";
+    std::cerr << "  --threads,     -t    Number of runtime threads\n";
+    std::cerr << "  --iterations,  -n    Number of benchmark iterations (default: 5)\n";
+    std::cerr << "  --warmup,      -w    Number of warm-up iterations (default: 1)\n";
+    std::cerr << "  --json-output, -j    Write benchmark results to JSON file\n";
+    std::cerr << "  --help,        -h    Show this help message and exit\n\n";
 
     std::cerr << "Example:\n";
     std::cerr << "  " << prog
@@ -51,6 +54,7 @@ int main(int argc, char** argv)
     }
 
     std::string modelPath;
+    std::string jsonOutputPath;
     int numInputTokens   = 0;
     int numOutputTokens  = 0;
     int numThreads       = 0;
@@ -124,6 +128,10 @@ int main(int argc, char** argv)
         else if (arg == "--warmup" || arg == "-w") {
             numWarmup = parseIntArg(arg);
         }
+        else if (arg == "--json-output" || arg == "--json_output" || arg == "-j") {
+            requireValue(arg);
+            jsonOutputPath = argv[++i];
+        }
         else {
             std::cerr << "Unknown or incomplete argument: " << arg << "\n";
             PrintUsage(argv[0]);
@@ -144,6 +152,15 @@ int main(int argc, char** argv)
         return 1;
     }
 
+    if (!jsonOutputPath.empty()) {
+        const std::filesystem::path outputPath(jsonOutputPath);
+        const std::filesystem::path outputDir = outputPath.parent_path();
+        if (!outputDir.empty() && (!std::filesystem::exists(outputDir) || !std::filesystem::is_directory(outputDir))) {
+            std::cerr << "Error: JSON output directory does not exist: " << outputDir.string() << "\n";
+            return 1;
+        }
+    }
+
     std::string sharedLibraryPath = std::filesystem::current_path().string();
     // Run benchmark
     LlmBenchmark bench(modelPath,
@@ -158,5 +175,19 @@ int main(int argc, char** argv)
     int rc = bench.Run();
     auto results = bench.GetResults();
     std::cout << results << std::endl;
+    if (!jsonOutputPath.empty()) {
+        if (rc != 0) {
+            std::cerr << "JSON output requested but benchmark failed; no file written.\n";
+            return rc;
+        }
+        std::ofstream out(jsonOutputPath);
+        if (!out) {
+            std::cerr << "Failed to open JSON output file: " << jsonOutputPath << "\n";
+            return 1;
+        }
+        out << bench.GetResultsJson() << std::endl;
+        const std::string absoluteOutputPath = std::filesystem::absolute(jsonOutputPath).string();
+        std::cout << "JSON output written to: " << absoluteOutputPath << "\n";
+    }
     return rc;
 }

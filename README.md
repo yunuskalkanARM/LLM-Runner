@@ -500,6 +500,7 @@ Instead of writing your own prompts or relying on framework-specific benchmarkin
     --threads   <num_threads>         | -t <num_threads> \
     --iterations <num_iterations>     | -n <num_iterations> \
     [ --context <tokens>              | -c <tokens> ] \
+    [ --json-output <path>            | -j <path> ] \
     [ --warmup <warmup_iterations>    | -w <warmup_iterations> ]
 ```
 

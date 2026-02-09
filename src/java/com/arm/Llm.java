@@ -387,4 +387,14 @@ public class Llm {
      */
     public native String getBenchmarkResults();
 
+    /**
+     * Get the last benchmark results as a JSON string.
+     *
+     * This does NOT run any benchmark; it simply returns the JSON
+     * summary from the most recent runBenchmark() call.
+     *
+     * @return JSON benchmark report, or a JSON error message.
+     */
+    public native String getBenchmarkResultsJson();
+
 }

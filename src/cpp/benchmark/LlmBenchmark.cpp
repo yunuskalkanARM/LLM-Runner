@@ -12,8 +12,11 @@
 #include <sstream>
 #include <iomanip>
 #include <cmath>
+#include <nlohmann/json.hpp>
 
 using namespace std::chrono;
+
+using nlohmann::json;
 
 LlmBenchmark::~LlmBenchmark() {}
 
@@ -136,41 +139,7 @@ std::string LlmBenchmark::GetResults() const
     if (m_results.empty()) {
         return "No benchmark results available. Run() has not been executed yet.\n";
     }
-
-    const double n = static_cast<double>(m_results.size());
-
-    // --- compute means ---
-    double sumTTFT = 0.0, sumTotal = 0.0;
-    double sumEncodeTPS = 0.0, sumDecodeTPS = 0.0;
-
-    for (const auto& ir : m_results) {
-        sumTTFT     += ir.timeToFirstTokenMs;
-        sumTotal    += ir.totalTimeMs;
-        sumEncodeTPS+= ir.encodeTokensPerSec;
-        sumDecodeTPS+= ir.decodeTokensPerSec;
-    }
-
-    double meanTTFT      = sumTTFT / n;
-    double meanTotal     = sumTotal / n;
-    double meanEncodeTPS = sumEncodeTPS / n;
-    double meanDecodeTPS = sumDecodeTPS / n;
-
-    // --- compute stddev ---
-    double varTTFT = 0.0, varTotal = 0.0;
-    double varEncodeTPS = 0.0, varDecodeTPS = 0.0;
-
-    for (const auto& ir : m_results) {
-        varTTFT  += std::pow(ir.timeToFirstTokenMs - meanTTFT, 2);
-        varTotal += std::pow(ir.totalTimeMs - meanTotal, 2);
-
-        varEncodeTPS += std::pow(ir.encodeTokensPerSec - meanEncodeTPS, 2);
-        varDecodeTPS += std::pow(ir.decodeTokensPerSec - meanDecodeTPS, 2);
-    }
-
-    double stdTTFT      = std::sqrt(varTTFT / n);
-    double stdTotal     = std::sqrt(varTotal / n);
-    double stdEncodeTPS = std::sqrt(varEncodeTPS / n);
-    double stdDecodeTPS = std::sqrt(varDecodeTPS / n);
+    const auto stats = ComputeSummaryStats();
 
     // --- Format output ---
     std::ostringstream oss;
@@ -245,31 +214,139 @@ std::string LlmBenchmark::GetResults() const
     oss << "| " << pad(fw, COL_FW)
         << " | " << pad(threadsStr, COL_TH)
         << " | " << pad("pp" + std::to_string(m_numInputTokens), COL_TEST)
-        << " | " << pad(formatPerf(meanEncodeTPS, stdEncodeTPS, "t/s"), COL_PERF)
+        << " | " << pad(formatPerf(stats.mean.encodeTokensPerSec,
+                                   stats.stddev.encodeTokensPerSec,
+                                   "t/s"),
+                        COL_PERF)
         << " |\n";
 
     // tgN (decode)
     oss << "| " << pad(fw, COL_FW)
         << " | " << pad(threadsStr, COL_TH)
         << " | " << pad("tg" + std::to_string(m_numOutputTokens), COL_TEST)
-        << " | " << pad(formatPerf(meanDecodeTPS, stdDecodeTPS, "t/s"), COL_PERF)
+        << " | " << pad(formatPerf(stats.mean.decodeTokensPerSec,
+                                   stats.stddev.decodeTokensPerSec,
+                                   "t/s"),
+                        COL_PERF)
         << " |\n";
 
     // TTFT
     oss << "| " << pad(fw, COL_FW)
         << " | " << pad(threadsStr, COL_TH)
         << " | " << pad("TTFT", COL_TEST)
-        << " | " << pad(formatPerf(meanTTFT, stdTTFT, "ms"), COL_PERF)
+        << " | " << pad(formatPerf(stats.mean.timeToFirstTokenMs,
+                                   stats.stddev.timeToFirstTokenMs,
+                                   "ms"),
+                        COL_PERF)
         << " |\n";
 
     // Total
     oss << "| " << pad(fw, COL_FW)
         << " | " << pad(threadsStr, COL_TH)
         << " | " << pad("Total", COL_TEST)
-        << " | " << pad(formatPerf(meanTotal, stdTotal, "ms"), COL_PERF)
+        << " | " << pad(formatPerf(stats.mean.totalTimeMs,
+                                   stats.stddev.totalTimeMs,
+                                   "ms"), COL_PERF)
         << " |\n";
 
     return oss.str();
+}
+
+std::string LlmBenchmark::GetResultsJson() const
+{
+    if (m_results.empty()) {
+        return json{{"error", "No benchmark results available. Run() has not been executed yet."}}.dump();
+    }
+    const auto stats = ComputeSummaryStats();
+    const auto round3 = [](double value) {
+        return std::round(value * 1000.0) / 1000.0;
+    };
+
+    json out;
+    out["parameters"] = {
+        {"model_path", m_modelPath},
+        {"num_input_tokens", m_numInputTokens},
+        {"num_output_tokens", m_numOutputTokens},
+        {"context_size", m_contextSize},
+        {"num_threads", m_numThreads},
+        {"num_iterations", m_numIterations},
+        {"num_warmup", m_numWarmupIterations},
+    };
+    out["framework"] = m_frameworkType;
+    out["results"] = {
+        {"mean", {
+            {"encode_tokens_per_sec", round3(stats.mean.encodeTokensPerSec)},
+            {"decode_tokens_per_sec", round3(stats.mean.decodeTokensPerSec)},
+            {"ttft_ms", round3(stats.mean.timeToFirstTokenMs)},
+            {"total_ms", round3(stats.mean.totalTimeMs)},
+        }},
+        {"stddev", {
+            {"encode_tokens_per_sec", round3(stats.stddev.encodeTokensPerSec)},
+            {"decode_tokens_per_sec", round3(stats.stddev.decodeTokensPerSec)},
+            {"ttft_ms", round3(stats.stddev.timeToFirstTokenMs)},
+            {"total_ms", round3(stats.stddev.totalTimeMs)},
+        }},
+    };
+
+    out["iterations"] = json::array();
+    for (const auto& ir : m_results) {
+        out["iterations"].push_back({
+            {"time_to_first_token_ms", round3(ir.timeToFirstTokenMs)},
+            {"total_time_ms", round3(ir.totalTimeMs)},
+            {"tokens_generated", ir.tokensGenerated},
+            {"encode_time_sec", round3(ir.encodeTimeSec)},
+            {"decode_time_sec", round3(ir.decodeTimeSec)},
+            {"encode_tokens_per_sec", round3(ir.encodeTokensPerSec)},
+            {"decode_tokens_per_sec", round3(ir.decodeTokensPerSec)},
+        });
+    }
+
+    return out.dump();
+}
+
+LlmBenchmark::SummaryStats LlmBenchmark::ComputeSummaryStats() const
+{
+    SummaryStats stats{};
+    const double n = static_cast<double>(m_results.size());
+    if (n == 0.0) {
+        return stats;
+    }
+
+    double sumTimeToFirstTokenMs = 0.0;
+    double sumTotalTimeMs = 0.0;
+    double sumEncodeTokensPerSec = 0.0;
+    double sumDecodeTokensPerSec = 0.0;
+
+    for (const auto& ir : m_results) {
+        sumTimeToFirstTokenMs += ir.timeToFirstTokenMs;
+        sumTotalTimeMs += ir.totalTimeMs;
+        sumEncodeTokensPerSec += ir.encodeTokensPerSec;
+        sumDecodeTokensPerSec += ir.decodeTokensPerSec;
+    }
+
+    stats.mean.timeToFirstTokenMs = sumTimeToFirstTokenMs / n;
+    stats.mean.totalTimeMs = sumTotalTimeMs / n;
+    stats.mean.encodeTokensPerSec = sumEncodeTokensPerSec / n;
+    stats.mean.decodeTokensPerSec = sumDecodeTokensPerSec / n;
+
+    double sumSqrDeltaTimeToFirstTokenMs = 0.0;
+    double sumSqrDeltaTotalTimeMs = 0.0;
+    double sumSqrDeltaEncodeTokensPerSec = 0.0;
+    double sumSqrDeltaDecodeTokensPerSec = 0.0;
+
+    for (const auto& ir : m_results) {
+        sumSqrDeltaTimeToFirstTokenMs += std::pow(ir.timeToFirstTokenMs - stats.mean.timeToFirstTokenMs, 2);
+        sumSqrDeltaTotalTimeMs += std::pow(ir.totalTimeMs - stats.mean.totalTimeMs, 2);
+        sumSqrDeltaEncodeTokensPerSec += std::pow(ir.encodeTokensPerSec - stats.mean.encodeTokensPerSec, 2);
+        sumSqrDeltaDecodeTokensPerSec += std::pow(ir.decodeTokensPerSec - stats.mean.decodeTokensPerSec, 2);
+    }
+
+    stats.stddev.timeToFirstTokenMs = std::sqrt(sumSqrDeltaTimeToFirstTokenMs / n);
+    stats.stddev.totalTimeMs = std::sqrt(sumSqrDeltaTotalTimeMs / n);
+    stats.stddev.encodeTokensPerSec = std::sqrt(sumSqrDeltaEncodeTokensPerSec / n);
+    stats.stddev.decodeTokensPerSec = std::sqrt(sumSqrDeltaDecodeTokensPerSec / n);
+
+    return stats;
 }
 
 int LlmBenchmark::Run()

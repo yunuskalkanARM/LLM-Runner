@@ -14,6 +14,7 @@
 #include "LlmBenchmark.hpp"
 
 static std::string benchmarkResults;
+static std::string benchmarkResultsJson;
 
 /**
 * @brief inline method to throw error in java
@@ -403,6 +404,7 @@ Java_com_arm_Llm_runBenchmark(
 
         // Cache results in a simple string, not in a long-lived object
         benchmarkResults = bench.GetResults();
+        benchmarkResultsJson = bench.GetResultsJson();
 
         return static_cast<jint>(rc);
     } catch (const std::exception& e) {
@@ -422,6 +424,7 @@ Java_com_arm_Llm_getBenchmarkResults(JNIEnv* env,
     try {
         if (benchmarkResults.empty()) {
             const char* msg = "No benchmark results available. Call runBenchmark() first.";
+            ThrowJavaException(env, msg);
             return env->NewStringUTF(msg);
         }
         return env->NewStringUTF(benchmarkResults.c_str());
@@ -433,6 +436,30 @@ Java_com_arm_Llm_getBenchmarkResults(JNIEnv* env,
     }
     catch (...) {
         std::string msg = "getBenchmarkResults failed: unknown error";
+        ThrowJavaException(env, msg.c_str());
+        return env->NewStringUTF(msg.c_str());
+    }
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_arm_Llm_getBenchmarkResultsJson(JNIEnv* env,
+                                         jobject /* thisObj */)
+{
+    try {
+        if (benchmarkResultsJson.empty()) {
+            const char* msg = "No benchmark results available. Call runBenchmark() first.";
+            ThrowJavaException(env, msg);
+            return env->NewStringUTF(msg);
+        }
+        return env->NewStringUTF(benchmarkResultsJson.c_str());
+    }
+    catch (const std::exception& e) {
+        std::string msg = std::string("getBenchmarkResultsJson failed: ") + e.what();
+        ThrowJavaException(env, msg.c_str());
+        return env->NewStringUTF(msg.c_str());
+    }
+    catch (...) {
+        std::string msg = "getBenchmarkResultsJson failed: unknown error";
         ThrowJavaException(env, msg.c_str());
         return env->NewStringUTF(msg.c_str());
     }
